@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f7f2">
+    <title>FPL Optimizer</title>
+    <meta name="description" content="Use your Fantasy Premier League squad and Gameweek projections to pick your starting XI, captain, and bench.">
+    <link rel="stylesheet" href="/assets/styles.css">
+    <script defer src="/assets/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="wordmark" href="/" aria-label="FPL Optimizer home">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span>FPL <strong>Optimizer</strong></span>
+        </a>
+        <div class="topbar-actions">
+          <span class="data-status" id="data-status" data-state="loading"><span></span><span id="data-status-label">Connecting…</span></span>
+          <button class="refresh-button" id="refresh" type="button" disabled>
+            <span class="refresh-icon" aria-hidden="true">↻</span><span>Refresh data</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="shell">
+      <div class="page-header">
+        <div>
+          <h1>Lineup optimizer</h1>
+          <p>Find the highest-projected XI from your Fantasy Premier League squad.</p>
+        </div>
+        <div class="gameweek" aria-label="Gameweek information">
+          <span class="gameweek-season" id="season">Upcoming Gameweek</span>
+          <strong id="gameweek">—</strong>
+          <span id="deadline" class="deadline">Checking the FPL deadline…</span>
+        </div>
+      </div>
+
+      <p id="data-message" class="notice" role="status" hidden></p>
+      <p id="data-warning" class="notice notice-warning" role="status" hidden></p>
+
+      <div class="dashboard">
+        <aside class="sidebar" aria-label="Squad inputs and model information">
+          <section class="panel squad-panel" aria-labelledby="squad-heading">
+            <h2 id="squad-heading">Your squad</h2>
+            <p class="panel-intro">Import all 15 players to get your lineup.</p>
+
+            <div class="input-switch" role="group" aria-label="Import method">
+              <button type="button" id="manager-toggle" aria-pressed="true" aria-controls="manager-form">Manager ID</button>
+              <button type="button" id="upload-toggle" aria-pressed="false" aria-controls="upload-form">Upload file</button>
+            </div>
+
+            <form id="manager-form">
+              <label for="manager-id">FPL Manager ID</label>
+              <input id="manager-id" name="manager_id" type="text" inputmode="numeric" autocomplete="off" required pattern="[0-9]+" maxlength="12" placeholder="Enter your ID" aria-describedby="manager-help">
+              <p class="field-help" id="manager-help">Find it in your team URL after <code>/entry/</code>.</p>
+              <button type="submit" class="primary-button action" disabled>Optimize my lineup <span aria-hidden="true">→</span></button>
+            </form>
+
+            <form id="upload-form" hidden>
+              <label for="squad-file">Squad file</label>
+              <div class="drop-zone" id="drop-zone">
+                <input id="squad-file" name="file" type="file" accept=".csv,.json,text/csv,application/json" aria-describedby="upload-help">
+                <span aria-hidden="true" class="upload-icon">↑</span>
+                <strong id="file-label">Choose a CSV or JSON file</strong>
+                <span class="file-subtitle">or drag it here</span>
+              </div>
+              <p class="field-help" id="upload-help">Use a CSV with an <code>id</code> or <code>name</code> column, or a JSON array of IDs or names. <a href="/sample.csv" download="fpl-squad.csv">Download sample CSV</a>.</p>
+              <button type="submit" class="primary-button action" disabled>Optimize my lineup <span aria-hidden="true">→</span></button>
+            </form>
+
+            <p id="request-message" class="request-message" role="status" hidden></p>
+            <div class="sample">
+              <button id="demo" class="text-button action" type="button" disabled>Try a sample squad <span aria-hidden="true">↗</span></button>
+            </div>
+          </section>
+
+          <section class="panel model-panel" aria-labelledby="model-heading">
+            <div class="model-heading">
+              <h2 id="model-heading">Projection model</h2>
+              <span class="model-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+            </div>
+            <p class="panel-intro" id="coverage">Waiting for historical coverage…</p>
+            <dl class="model-metrics" id="model-metrics" hidden>
+              <div>
+                <dt>Model MAE</dt>
+                <dd id="model-mae">—</dd>
+              </div>
+              <div>
+                <dt title="Baseline forecasts use average points over the previous six fixtures, with a position-based default for new players.">Baseline MAE</dt>
+                <dd id="baseline-mae">—</dd>
+              </div>
+            </dl>
+            <p class="field-help" id="metric-help" hidden>Mean absolute error in points on held-out Gameweeks, evaluated in chronological order. Lower is better.</p>
+          </section>
+          <p class="data-date" id="data-date" hidden></p>
+        </aside>
+
+        <div class="recommendation" id="recommendation" aria-busy="false">
+          <section class="lineup" aria-labelledby="lineup-heading">
+            <div class="lineup-header">
+              <div>
+                <h2 id="lineup-heading">Starting XI</h2>
+                <div class="lineup-meta">
+                  <span class="formation" id="formation" hidden></span>
+                  <span class="lineup-source" id="lineup-source">Import a squad to reveal your XI.</span>
+                </div>
+              </div>
+              <div class="score">
+                <span>Projected total</span>
+                <div><strong id="projected-score">—</strong> <span class="points-unit">pts</span></div>
+              </div>
+            </div>
+            <p class="notice notice-warning" id="lineup-warning" hidden></p>
+            <div class="pitch" id="pitch">
+              <div class="pitch-markings" aria-hidden="true">
+                <span class="field-boundary"></span>
+                <span class="midline"></span>
+                <span class="center-circle"></span>
+                <span class="penalty-area penalty-top"></span>
+                <span class="penalty-area penalty-bottom"></span>
+                <span class="goal-area goal-top"></span>
+                <span class="goal-area goal-bottom"></span>
+              </div>
+              <div class="pitch-rows" id="pitch-rows" aria-label="Projected starters"></div>
+            </div>
+            <div class="lineup-footer">
+              <div id="lineup-legend" class="legend">
+                <span><b>C</b> Captain</span><span><b>VC</b> Vice-captain</span>
+              </div>
+              <span id="lineup-breakdown" class="breakdown" hidden></span>
+            </div>
+          </section>
+
+          <section class="panel bench" aria-labelledby="bench-heading">
+            <div class="bench-header">
+              <h2 id="bench-heading">Bench</h2>
+              <span>By projected points</span>
+            </div>
+            <div class="bench-grid" id="bench-grid"></div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <dialog class="player-dialog" id="player-dialog" aria-labelledby="detail-name">
+      <div class="dialog-header">
+        <div>
+          <h2 id="detail-name"></h2>
+          <p id="detail-position"></p>
+        </div>
+        <form method="dialog"><button class="dialog-close" aria-label="Close player details">×</button></form>
+      </div>
+      <dl id="detail-availability" class="model-metrics detail-availability"></dl>
+      <div id="detail-fixtures" class="detail-fixtures"></div>
+    </dialog>
+  </body>
+</html>
