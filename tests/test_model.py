@@ -37,6 +37,14 @@ class VenuePoints:
         return 4 + 3 * features["home"].to_numpy()
 
 
+class LearnsFlags:
+    classes_ = np.array([0, 4])
+
+    def predict_proba(self, features):
+        available = features["flag_probability"].fillna(1).to_numpy()
+        return np.column_stack((1 - available, available))
+
+
 def bootstrap():
     original = {"id": 99, "web_name": "Example", "code": 12345, "team": 1, "element_type": 3, "status": "a"}
     blank = {**original, "id": 100, "code": 789, "team": 4, "element_type": 1}
@@ -68,6 +76,52 @@ class FeatureHistoryTests(unittest.TestCase):
         self.assertEqual(actual.iloc[0]["points_3"], 5)
         self.assertEqual(actual.iloc[0]["opponent_goals_for_20"], 2)
         self.assertTrue(pd.isna(actual.iloc[0]["expected_goals_20"]))
+
+    def test_new_context_and_team_xg_are_deadline_safe(self):
+        prior = match(1, 1, "2026-08-08 15:00")
+        target = match(2, 2, "2026-08-15 15:00")
+        cutoff = target["deadline"]
+        home = dict(outcome(prior, 3), expected_goals=0.4)
+        away = dict(outcome(prior, 4), home=False, team=2, opponent=1, player=678, expected_goals=1.3)
+        result = dict(outcome(target, 10), expected_goals=99)
+        roster = pd.DataFrame([
+            {"season": 2026, "gameweek": 2, "player": 12345, "context_asof": timestamp,
+             "flag_probability": chance, "penalty_order": rank}
+            for timestamp, chance, rank in ((cutoff - pd.Timedelta(hours=1), 0.75, 2), (cutoff, 0, 1))
+        ])
+        quotes = pd.DataFrame([
+            {"season": 2026, "fixture": 2, "market_asof": timestamp,
+             "home_expected_goals": rate, "away_expected_goals": 2.4, "home_clean_sheet_probability": 0.25}
+            for timestamp, rate in ((cutoff - pd.Timedelta(hours=2), 1.4), (cutoff, 4.2))
+        ])
+        fixtures = pd.DataFrame([prior, target]).assign(home_team_code=3, away_team_code=7)
+        workload = pd.DataFrame({"team_code": [3, 3], "kickoff": [
+            cutoff - pd.Timedelta(days=3), cutoff - pd.Timedelta(hours=1)
+        ]})
+        workload.attrs.update(covered_years=(2026,), club_codes=(3, 7))
+        builder = FeatureHistory(
+            pd.DataFrame([home, away, result]), fixtures, player_context=roster,
+            market_context=quotes, other_fixtures=workload,
+        )
+        row = builder.snapshot(pd.DataFrame([result]), 2026, 2, cutoff).iloc[0]
+        self.assertEqual(row["team_xg_for_6"], 0.4)
+        self.assertEqual(row["team_xg_against_6"], 1.3)
+        self.assertEqual(row["opponent_xg_for_20"], 1.3)
+        self.assertEqual(row["flag_probability"], 0.75)
+        self.assertEqual(row["penalty_order"], 2)
+        self.assertEqual(row["market_team_xg"], 1.4)
+        self.assertEqual(row["market_opponent_xg"], 2.4)
+        self.assertEqual(row["other_matches_7"], 1)
+
+    def test_post_deadline_transfer_does_not_supply_old_club_features(self):
+        fixture = match(1, 1, "2026-08-08 15:00")
+        context = pd.DataFrame([{
+            "season": 2026, "gameweek": 1, "player": 12345, "context_team": 2,
+            "context_position": "MID", "context_asof": fixture["deadline"] - pd.Timedelta(hours=1),
+        }])
+        rows = pd.DataFrame([outcome(fixture, 5), dict(outcome(fixture, 4), player=99)])
+        builder = FeatureHistory(rows, pd.DataFrame([fixture]), player_context=context)
+        self.assertEqual(_observations(builder)["_player"].tolist(), [99])
 
     def test_training_cutoff_excludes_unfinished_and_not_yet_known_labels(self):
         complete = match(1, 1, "2026-08-08 15:00")
@@ -118,6 +172,22 @@ class ForecastTests(unittest.TestCase):
         self.assertEqual(predictions[101]["points"], 5.5)
         self.assertEqual(predictions[101]["start_chance"], 0.5)
         self.assertEqual(predictions[101]["sixty_chance"], 0.5)
+
+    def test_model_using_archived_flags_does_not_apply_live_flag_twice(self):
+        prior = match(1, 1, "2026-08-08 15:00")
+        fixture = match(2, 3, "2026-08-22 15:00", finished=False)
+        cutoff = fixture["deadline"]
+        context = pd.DataFrame([{
+            "season": 2026, "gameweek": 3, "player": 345,
+            "context_asof": cutoff - pd.Timedelta(hours=1), "flag_probability": 0.5,
+        }])
+        forecast_model = FPLModel(LearnsFlags(), VenuePoints(), ("home", "flag_probability"), {}, 1, [2026])
+        predictions = forecast(
+            forecast_model, pd.DataFrame([outcome(prior, 5)]), pd.DataFrame([prior, fixture]),
+            bootstrap(), 2026, 3, cutoff, player_context=context,
+        )
+        self.assertEqual(predictions[101]["points"], 3.5)
+        self.assertEqual(predictions[101]["appearance_chance"], 0.5)
 
 
 if __name__ == "__main__":

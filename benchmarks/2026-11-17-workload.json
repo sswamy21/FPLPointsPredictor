@@ -1,0 +1,116 @@
+{
+  "models": [
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9330895769690737,
+      "rmse": 1.9097564419908328,
+      "baseline_mae": 1.073750766923444,
+      "rows": 29338,
+      "squads": 740,
+      "mean_lineup_points": 39.74324324324324,
+      "mean_captain_points": 5.0027027027027025,
+      "folds": [
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9330895769690737,
+          "rmse": 1.9097564419908328,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.74324324324324,
+          "mean_captain_points": 5.0027027027027025
+        }
+      ],
+      "feature_set": "base+player_cup_workload"
+    }
+  ],
+  "ablations": [
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9345962736572692,
+      "rmse": 1.9118441295903632,
+      "baseline_mae": 1.073750766923444,
+      "rows": 29338,
+      "squads": 740,
+      "mean_lineup_points": 39.82837837837838,
+      "mean_captain_points": 4.998648648648649,
+      "folds": [
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9345962736572692,
+          "rmse": 1.9118441295903632,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.82837837837838,
+          "mean_captain_points": 4.998648648648649
+        }
+      ],
+      "feature_set": "base"
+    },
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9330895769690737,
+      "rmse": 1.9097564419908328,
+      "baseline_mae": 1.073750766923444,
+      "rows": 29338,
+      "squads": 740,
+      "mean_lineup_points": 39.74324324324324,
+      "mean_captain_points": 5.0027027027027025,
+      "folds": [
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9330895769690737,
+          "rmse": 1.9097564419908328,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.74324324324324,
+          "mean_captain_points": 5.0027027027027025
+        }
+      ],
+      "feature_set": "base+player_cup_workload"
+    }
+  ],
+  "feature_coverage": {
+    "player_cup_workload": {
+      "usable": true,
+      "columns": [
+        "other_player_minutes_7d",
+        "other_player_starts_7d",
+        "other_player_appearances_7d"
+      ],
+      "folds": [
+        {
+          "season": 2025,
+          "training_rows": 12393,
+          "test_rows": 3792,
+          "total_test_rows": 29747,
+          "varying_training_columns": 3
+        }
+      ]
+    }
+  },
+  "availability_policy": "Apply the archived flag as a multiplier when it is absent from model features.",
+  "baseline": {
+    "mae": 1.073750766923444,
+    "rmse": 2.1200468672043944,
+    "squads": 740,
+    "mean_lineup_points": 37.20540540540541,
+    "mean_captain_points": 3.960810810810811
+  },
+  "replay": {
+    "source": "reconstructed from prior appearances and timestamped rosters when available",
+    "squads_per_round": 20,
+    "seed": 61117,
+    "rounds": 37,
+    "score": "XI points plus one additional copy of the captain's points",
+    "squad_limits": "Standard positional totals and a maximum of three players per club"
+  }
+}

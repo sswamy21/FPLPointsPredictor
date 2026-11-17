@@ -15,7 +15,7 @@ import sklearn
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
-from . import data, model
+from . import congestion, data, markets, model, player_workload, snapshots
 from .lineup import POSITION_IDS, SquadError, demo_squad, optimize, resolve_upload
 
 LOGGER = logging.getLogger(__name__)
@@ -34,21 +34,30 @@ def season_label(year):
     return f"{year}/{(year + 1) % 100:02d}"
 
 
-def _model_key(history, training_fixtures):
+def _model_key(history, training_fixtures, context, exclude_groups):
     digest = hashlib.sha256()
     digest.update(sklearn.__version__.encode())
     digest.update(pd.__version__.encode())
-    for module in (data, model):
+    digest.update(repr(exclude_groups).encode())
+    for module in (data, model, snapshots, congestion, player_workload, markets):
         digest.update(Path(module.__file__).read_bytes())
-    for frame in (history, training_fixtures):
+    for frame in (history, training_fixtures, *context.values()):
         for column, dtype in frame.dtypes.items():
             digest.update(f"{column}:{dtype};".encode())
         digest.update(pd.util.hash_pandas_object(frame, index=False).values.tobytes())
+        digest.update(repr(frame.attrs).encode())
     return digest.hexdigest()
 
 
-def _cached_model(cache, history, training_fixtures, deadline):
-    key = _model_key(history, training_fixtures)
+def _cached_model(cache, history, training_fixtures, deadline, context):
+    exclude_groups = []
+    if os.environ.get("FPL_ENABLE_PLAYER_WORKLOAD") != "1":
+        exclude_groups.append("player_cup_workload")
+        context = dict(context, player_workload=context["player_workload"].iloc[:0])
+    if os.environ.get("FPL_ENABLE_MARKET") != "1" and not os.environ.get("FPL_MARKET_CSV"):
+        exclude_groups.append("market")
+        context = dict(context, market_context=context["market_context"].iloc[:0])
+    key = _model_key(history, training_fixtures, context, exclude_groups)
     cache.mkdir(parents=True, exist_ok=True)
     artifact = cache / "predictor.joblib"
     if artifact.is_file():
@@ -59,7 +68,8 @@ def _cached_model(cache, history, training_fixtures, deadline):
         except Exception:
             LOGGER.warning("Could not read the local model cache. Refitting it.", exc_info=True)
 
-    trained = model.fit_model(history, training_fixtures, validate=True, as_of=deadline)
+    trained = model.fit_model(history, training_fixtures, validate=True, as_of=deadline,
+                              exclude_groups=exclude_groups, **context)
     with NamedTemporaryFile(dir=cache, suffix=".joblib", delete=False) as temp:
         temporary = Path(temp.name)
     try:
@@ -96,13 +106,14 @@ class ForecastService:
         try:
             self._set_phase("Fetching official FPL fixtures and player histories…")
             live = self.store.live(refresh=refresh)
-            self._set_phase("Reading the historical seasons from the local cache…")
-            archived, archived_fixtures = self.store.history(through=live.season - 1)
-            history, training_fixtures, full_fixtures = combine(archived, archived_fixtures, live)
+            self._set_phase("Loading historical results and pre-deadline fixture context…")
+            history, training_fixtures, full_fixtures, context = load_inputs(self.store, live, refresh=refresh)
             self._set_phase("Training or loading the model and projecting the upcoming Gameweek…")
-            trained = _cached_model(self.cache, history, training_fixtures, live.deadline)
+            trained = _cached_model(
+                self.cache, history, training_fixtures, live.deadline, training_context(context, training_fixtures)
+            )
             predictions = model.forecast(
-                trained, history, full_fixtures, live.bootstrap, live.season, live.gameweek, live.deadline
+                trained, history, full_fixtures, live.bootstrap, live.season, live.gameweek, live.deadline, **context
             )
             expected_ids = {
                 player["id"] for player in live.bootstrap["elements"]
@@ -111,12 +122,22 @@ class ForecastService:
             missing = expected_ids - predictions.keys()
             if missing:
                 raise RuntimeError(f"The predictor omitted {len(missing)} official FPL players.")
-            years = sorted(set(archived["season"]))
+            years = sorted(int(year) for year in history["season"].unique() if year < live.season)
             if len(years) < 10:
                 raise RuntimeError(f"The archive contains {len(years)} seasons. At least 10 are required.")
+            current_rows = int(history["season"].eq(live.season).sum())
             coverage = {
                 "seasons": len(years), "first": season_label(years[0]), "last": season_label(years[-1]),
-                "rows": len(archived), "live_rows": len(history) - len(archived),
+                "rows": len(history) - current_rows, "live_rows": current_rows,
+                "predeadline_player_snapshots": len(context["player_context"]),
+                "predicted_minutes_snapshots": len(context["minutes_context"]),
+                "market_fixture_snapshots": len(context["market_context"]),
+                "cup_team_matches": len(context["other_fixtures"]),
+                "cup_player_matches": len(context["player_workload"]),
+                "active_feature_groups": [
+                    name for name, features in model.FEATURE_GROUPS.items()
+                    if set(features).intersection(trained.feature_columns)
+                ],
             }
             with self.lock:
                 self.snapshot = Snapshot(live, predictions, coverage, trained.metrics)
@@ -188,6 +209,56 @@ def combine(archived, archived_fixtures, live):
     training_fixtures = pd.concat([archived_fixtures, completed], ignore_index=True)
     full_fixtures = pd.concat([archived_fixtures, live.fixtures], ignore_index=True)
     return history, training_fixtures, full_fixtures
+
+
+def _official_deadlines(fixtures, player_context):
+    official = player_context.groupby(["season", "gameweek"])["context_deadline"].first()
+    joined = fixtures.join(official.rename("official_deadline"), on=["season", "gameweek"])
+    joined["deadline"] = joined.pop("official_deadline").combine_first(joined["deadline"])
+    return joined
+
+
+def _context_path(cache, env, filename):
+    configured = os.environ.get(env)
+    if configured:
+        return Path(configured).expanduser()
+    path = cache / filename
+    return path if path.is_file() else None
+
+
+def load_inputs(store, live, *, refresh=False):
+    archived, archived_fixtures = store.history(through=live.season - 1)
+    history, training, full = combine(archived, archived_fixtures, live)
+    cache = store.cache_dir
+    players = snapshots.load_player_context(cache, full, live)
+    full = _official_deadlines(full, players)
+    training = _official_deadlines(training, players)
+    market_path = _context_path(cache, "FPL_MARKET_CSV", "market.csv")
+    minutes_path = _context_path(cache, "FPL_MINUTES_CSV", "predicted-minutes.csv")
+    other_fixtures = congestion.load_other_fixtures(cache, refresh=refresh)
+    context = {
+        "player_context": players,
+        "market_context": markets.load_market_context(market_path, full),
+        "minutes_context": snapshots.load_minutes_context(minutes_path, full),
+        "other_fixtures": other_fixtures,
+        "player_workload": player_workload.load_player_workload(cache, other_fixtures, live),
+    }
+    return history, training, full, context
+
+
+def training_context(context, fixtures):
+    event_keys = fixtures[["season", "gameweek"]].drop_duplicates()
+    fixture_keys = fixtures[["season", "fixture"]].drop_duplicates()
+    other = context["other_fixtures"]
+    workload = context["player_workload"]
+    latest_deadline = fixtures["deadline"].max()
+    return {
+        "player_context": context["player_context"].merge(event_keys, on=["season", "gameweek"]),
+        "minutes_context": context["minutes_context"].merge(event_keys, on=["season", "gameweek"]),
+        "market_context": context["market_context"].merge(fixture_keys, on=["season", "fixture"]),
+        "other_fixtures": other.loc[other["kickoff"] < latest_deadline],
+        "player_workload": workload.loc[pd.to_datetime(workload["observed_at"], utc=True) < latest_deadline],
+    }
 
 
 def create_app(cache=None, *, warm=True):

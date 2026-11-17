@@ -10,9 +10,10 @@ from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostin
 from threadpoolctl import threadpool_limits
 
 from .data import player_identity
+from .player_workload import FEATURES as WORKLOAD_FEATURES, workload_features
 
 
-MODEL_VERSION = 2
+MODEL_VERSION = 3
 RESULT_LAG = pd.Timedelta(hours=3)
 DEADLINE_OFFSET = pd.Timedelta(minutes=90)
 POSITION = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -22,7 +23,22 @@ PLAYER_STATS = (
     "points", "minutes", "appearance", "start", "sixty", "goals_scored", "assists",
     "bonus", "bps", "expected_goals", "expected_assists", "expected_goals_conceded",
 )
-TEAM_STATS = ("goals_for", "goals_against")
+TEAM_XG = ("xg_for", "xg_against")
+TEAM_STATS = ("goals_for", "goals_against", *TEAM_XG)
+MARKET_QUOTES = ("home_expected_goals", "away_expected_goals", "home_clean_sheet_probability", "away_clean_sheet_probability")
+FEATURE_GROUPS = {
+    "team_xg": tuple(
+        f"{side}_{stat}_{window}"
+        for side in ("team", "opponent") for stat in TEAM_XG
+        for window in ("6", "20", "last_season")
+    ) + tuple(f"opponent_{stat}_venue" for stat in TEAM_XG),
+    "fpl_availability": ("flag_probability", "flag_age_days"),
+    "set_pieces": ("penalty_order", "direct_fk_order", "corner_fk_order"),
+    "predicted_minutes": ("expected_minutes", "predicted_start_probability"),
+    "other_competitions": ("other_matches_7", "other_matches_14", "days_since_other_match"),
+    "player_cup_workload": tuple(WORKLOAD_FEATURES.values()),
+    "market": ("market_team_xg", "market_opponent_xg", "market_team_clean_sheet", "market_opponent_clean_sheet"),
+}
 
 
 def _date(value):
@@ -55,7 +71,7 @@ def _historical_appearances(history):
     return rows
 
 
-def _fixture_teams(fixtures):
+def _fixture_teams(fixtures, players):
     matches = fixtures.copy()
     matches["kickoff"] = _date(matches["kickoff"])
     matches["deadline"] = _date(matches.get("deadline", pd.NaT))
@@ -68,13 +84,20 @@ def _fixture_teams(fixtures):
     result = matches.dropna(subset=["home_goals", "away_goals", "kickoff"])
     if "finished" in result:
         result = result.loc[result["finished"].fillna(False)]
-    scope = ["season", "kickoff", "_observed", "_event"]
+    scope = ["season", "fixture", "kickoff", "_observed", "_event"]
     home = result[scope + ["home_team", "home_team_code", "home_goals", "away_goals"]]
     away = result[scope + ["away_team", "away_team_code", "away_goals", "home_goals"]]
-    context = scope + ["team", "team_code", *TEAM_STATS]
+    context = scope + ["team", "team_code", "goals_for", "goals_against"]
     home = home.set_axis(context, axis=1)
     away = away.set_axis(context, axis=1)
     team_results = pd.concat([home.assign(home=True), away.assign(home=False)], ignore_index=True)
+    xg = players.loc[players["minutes"] > 0].groupby(["season", "fixture", "home"])["expected_goals"]
+    totals = xg.sum(min_count=1).where(xg.count() >= xg.size() * 0.8).rename("xg_for")
+    team_results = team_results.join(totals, on=["season", "fixture", "home"])
+    team_results["opposition_home"] = ~team_results["home"]
+    team_results = team_results.join(
+        totals.rename("xg_against"), on=["season", "fixture", "opposition_home"]
+    ).drop(columns="opposition_home")
     return matches, team_results.sort_values("kickoff", kind="stable")
 
 
@@ -82,12 +105,31 @@ def _available(rows, event, cutoff):
     return rows.loc[(rows["_event"] < event) & (rows["_observed"] <= cutoff)]
 
 
+def _by_round(frame):
+    return dict(tuple(frame.groupby(["season", "gameweek"], sort=False))) if frame is not None else {}
+
+
+def _join_context(targets, frame, context, cutoff, key, fields, timestamp="context_asof"):
+    if context is None:
+        return frame.assign(**{field: np.nan for field in fields})
+    eligible = context.loc[_date(context[timestamp]) < cutoff].sort_values(timestamp)
+    latest = eligible.drop_duplicates(key, keep="last").set_index(key)
+    values = latest.reindex(columns=fields)
+    return frame.assign(**{field: targets[key].map(values[field]) for field in fields})
+
+
 class FeatureHistory:
     """Build features from completed prior-Gameweek observations at one cutoff."""
 
-    def __init__(self, history, fixtures):
+    def __init__(self, history, fixtures, *, player_context=None, market_context=None,
+                 minutes_context=None, other_fixtures=None, player_workload=None):
         self.players = _historical_appearances(history)
-        self.fixtures, self.teams = _fixture_teams(fixtures)
+        self.fixtures, self.teams = _fixture_teams(fixtures, self.players)
+        self.player_context = _by_round(player_context)
+        self.minutes_context = _by_round(minutes_context)
+        self.market_context = dict(tuple(market_context.groupby("season", sort=False))) if market_context is not None else {}
+        self.other_fixtures = other_fixtures
+        self.player_workload = player_workload
         self.club_codes = pd.concat([
             self.fixtures[["season", f"{side}_team", f"{side}_team_code"]].set_axis(["season", "team", "team_code"], axis=1)
             for side in ("home", "away")
@@ -137,9 +179,49 @@ class FeatureHistory:
         previous_season = team_results.loc[team_results["season"] == season - 1]
         club_codes = self.club_codes.loc[self.club_codes["season"] == season].set_index("team")["team_code"]
         frame = self._team_context(frame, season_results, previous_season, club_codes, cutoff)
+        frame = _join_context(
+            targets, frame, self.player_context.get((season, gameweek)), cutoff, "player",
+            FEATURE_GROUPS["fpl_availability"] + FEATURE_GROUPS["set_pieces"],
+        )
+        frame = _join_context(
+            targets, frame, self.minutes_context.get((season, gameweek)), cutoff, "player",
+            FEATURE_GROUPS["predicted_minutes"],
+        )
+        frame = self._market_features(targets, frame, cutoff, season)
+        frame = self._other_competitions(frame, club_codes, cutoff)
+        frame = frame.join(workload_features(self.player_workload, targets["player"], cutoff))
         # Points-per-fixture form, with fixed positional priors for debuts.
         frame["baseline"] = frame["points_6"].fillna(frame["position"].map({1: 2.7, 2: 1.9, 3: 2.0, 4: 2.1})).fillna(2.0)
         return frame.drop(columns=["player", "team", "opponent"])
+
+    def _market_features(self, targets, frame, cutoff, season):
+        quotes = _join_context(targets, targets.iloc[:, :0], self.market_context.get(season),
+                               cutoff, "fixture", MARKET_QUOTES, "market_asof")
+        home = frame["home"].astype(bool)
+        home_xg, away_xg, home_cs, away_cs = (quotes[column] for column in MARKET_QUOTES)
+        return frame.assign(
+            market_team_xg=home_xg.where(home, away_xg), market_opponent_xg=away_xg.where(home, home_xg),
+            market_team_clean_sheet=home_cs.where(home, away_cs), market_opponent_clean_sheet=away_cs.where(home, home_cs),
+        )
+
+    def _other_competitions(self, frame, club_codes, cutoff):
+        empty = {field: np.nan for field in FEATURE_GROUPS["other_competitions"]}
+        if self.other_fixtures is None or self.other_fixtures.empty:
+            return frame.assign(**empty)
+        attrs = self.other_fixtures.attrs
+        start = cutoff - pd.Timedelta(days=30)
+        if not {start.year, cutoff.year}.issubset(attrs["covered_years"]):
+            return frame.assign(**empty)
+        club = frame["team"].map(club_codes)
+        covered = club.isin(attrs["club_codes"])
+        known = self.other_fixtures.loc[self.other_fixtures["kickoff"] + RESULT_LAG <= cutoff]
+        features = {}
+        for days in (7, 14):
+            recent = known.loc[known["kickoff"] >= cutoff - pd.Timedelta(days=days)]
+            features[f"other_matches_{days}"] = club.map(recent.groupby("team_code").size()).fillna(0).where(covered)
+        last_played = club.map(known.groupby("team_code")["kickoff"].max())
+        features["days_since_other_match"] = (cutoff - last_played).dt.total_seconds().div(86400).clip(upper=30)
+        return frame.assign(**features)
 
     @staticmethod
     def _team_context(frame, rows, previous_season, club_codes, cutoff):
@@ -178,6 +260,14 @@ def _observations(builder, as_of=None):
     for (season, gameweek), targets in observations.groupby(["season", "gameweek"], sort=True):
         cutoff = builder.deadline(season, gameweek, targets)
         targets = targets.loc[targets["kickoff"] >= cutoff]
+        roster = _join_context(
+            targets, targets.iloc[:, :0], builder.player_context.get((season, gameweek)),
+            cutoff, "player", ("context_team", "context_position"),
+        )
+        # A transfer after the deadline cannot change the club on a historical prediction row.
+        valid = roster["context_team"].isna() | roster["context_team"].eq(targets["team"])
+        positions = roster["context_position"].combine_first(targets["position"])
+        targets = targets.loc[valid].assign(position=positions.loc[valid])
         if targets.empty:
             continue
         snapshot = builder.snapshot(targets, season, gameweek, cutoff)
@@ -207,6 +297,7 @@ def _fit(observations, features):
     appearances = observations["_outcome"] > 0
     if not appearances.any():
         raise ValueError("Training requires at least one recorded player appearance.")
+    features = tuple(column for column in features if observations[column].nunique() > 1)
     inputs = observations[list(features)]
     classes = observations["_outcome"]
     min_leaf = max(5, min(40, len(observations) // 100))
@@ -273,10 +364,12 @@ def _evaluate(observations, features):
     return {**_scores(pd.concat(all_weeks)), "folds": folds} if all_weeks else {"folds": [], "rows": 0}
 
 
-def fit_model(history_df, fixtures_df, validate=True, as_of=None):
+def fit_model(history_df, fixtures_df, validate=True, as_of=None, exclude_groups=(), **context):
     """Fit on complete fixtures, optionally evaluating expanding-season holdouts."""
-    observations = _observations(FeatureHistory(history_df, fixtures_df), as_of)
-    features = tuple(column for column in observations if not column.startswith("_") and column != "baseline")
+    observations = _observations(FeatureHistory(history_df, fixtures_df, **context), as_of)
+    excluded = {feature for group in exclude_groups for feature in FEATURE_GROUPS[group]}
+    features = tuple(column for column in observations if not column.startswith("_")
+                     and column != "baseline" and column not in excluded and observations[column].notna().any())
     model = _fit(observations, features)
     if validate:
         model.metrics = _evaluate(observations, features)
@@ -317,12 +410,12 @@ def _at_least_one(probabilities, key, multiplier):
     return multiplier * float(np.clip(1 - math.prod(1 - probability[key] for probability in probabilities), 0, 1))
 
 
-def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadline):
+def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadline, **context):
     """Predict each official player for every scheduled fixture at the same deadline."""
     cutoff = _date(deadline)
     if pd.isna(cutoff):
         raise ValueError("A forecast requires a valid upcoming Gameweek deadline.")
-    builder = FeatureHistory(history_df, fixtures_df)
+    builder = FeatureHistory(history_df, fixtures_df, **context)
     matches = builder.fixtures.loc[builder.fixtures["_event"] == _event_order(season, gameweek)]
     matches = matches.loc[matches["kickoff"].isna() | (matches["kickoff"] >= cutoff)].sort_values("kickoff", kind="stable")
     if "finished" in matches:
@@ -334,14 +427,17 @@ def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadli
     targets = _fixture_targets(matches, elements, season)
     by_element = {}
     if not targets.empty:
-        probabilities = _predict_fixtures(model, builder.snapshot(targets, season, gameweek, cutoff))
+        features = builder.snapshot(targets, season, gameweek, cutoff)
+        probabilities = _predict_fixtures(model, features)
+        probabilities["flag_used"] = "flag_probability" in model.feature_columns and features["flag_probability"].notna()
         by_element = {
             element: group.to_dict("records") for element, group in targets.join(probabilities).groupby("element", sort=False)
         }
     predictions = {}
     for element_id, element in elements.items():
-        multiplier = _status_multiplier(element, is_next)
         player_fixtures = by_element.get(element_id, [])
+        used_flag = any(match["flag_used"] for match in player_fixtures)
+        multiplier = 1.0 if used_flag else _status_multiplier(element, is_next)
         club = teams[element["team"]]
         fixture_details = []
         for match in player_fixtures:

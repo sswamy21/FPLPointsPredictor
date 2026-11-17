@@ -37,7 +37,9 @@ python -m fpl optimize --manager 123456 --refresh
 
 The model learns from the [historical FPL archive](https://github.com/vaastav/Fantasy-Premier-League) and the official [bootstrap](https://fantasy.premierleague.com/api/bootstrap-static/), [fixtures](https://fantasy.premierleague.com/api/fixtures/), and [element summary](https://fantasy.premierleague.com/api/element-summary/1/) endpoints. Stable player codes link season-specific IDs. Club form uses stable club codes and falls back to league priors for clubs without recent Premier League results. Missing xG, xA and xGC remain missing. Where starts are unavailable, 45 or more minutes serves as a proxy.
 
-Features come from completed prior Gameweeks, using the official deadline live and the first archived kickoff minus that season’s deadline offset when an archived deadline is missing. Results become eligible three hours after kickoff. The model uses 3-, 6-, and 20-fixture player form, venue, rest, and a difficulty estimate based on previous team and opponent results. The player details display the official upcoming fixture difficulty. Live availability adjusts the model’s estimates from prior appearances and minutes. In doubles, fixture projections are summed. In blanks, the projection is zero.
+Features come from completed prior Gameweeks. Results become eligible three hours after kickoff. The model uses 3-, 6-, and 20-fixture player form, venue, rest, and a difficulty estimate based on previous team and opponent results. Archived FPL snapshots recover official deadlines, availability and set-piece roles where available. The app can also use team xG, cup and European workload, and deadline-stamped market or minutes estimates. [Forecast methodology and validation](METHODOLOGY.md)
+
+In doubles, fixture projections are summed. In blanks, the projection is zero. The player details display the official upcoming fixture difficulty.
 
 The optimizer checks every legal formation. The projected score is the sum of the starting XI plus one extra copy of the highest-projected starter’s points. The second-highest starter is vice-captain. All four bench players are shown in points order, with the reserve goalkeeper labeled separately from the three outfield substitution priorities. [Official formation and captaincy rules](https://www.premierleague.com/en/news/2174899/1000)
 
@@ -50,4 +52,11 @@ python -m pytest -q
 
 Tests check deadline leakage, chronological backtesting, double and blank Gameweeks, lineup legality, and exact optimality against exhaustive combinations. To also run the live smoke test, start the dashboard and set `FPL_TEST_URL` to `http://127.0.0.1:8765`. The test uses public Manager ID `1` by default. Set `FPL_TEST_MANAGER` to select a different public ID.
 
-The November 17, 2026 run used 253,509 historical player-fixture records from 2016/17 to 2025/26 and 6,562 completed current-season records. Across the 2023/24, 2024/25 and 2025/26 season holdouts, the model had a mean absolute error of **0.98 points** per player-Gameweek over 84,999 observations with labeled fixtures. The six-fixture form baseline scored **1.06**. RMSE was **1.94 points**. Live verification targeted 2026/27 Gameweek 11.
+Install the optional benchmark dependencies to rerun the comparison across model families.
+
+```console
+python -m pip install -r requirements-benchmark.txt
+python -m fpl benchmark --output benchmark.json
+```
+
+The benchmark reports MAE, RMSE, and points from historically replayed lineup and captain decisions. See the methodology for results, coverage and optional data feeds. [Forecast methodology and validation](METHODOLOGY.md)

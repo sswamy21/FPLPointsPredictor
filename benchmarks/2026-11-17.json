@@ -1,0 +1,660 @@
+{
+  "models": [
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9349686204926615,
+      "rmse": 1.9015070864278232,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.23468468468469,
+      "mean_captain_points": 5.27027027027027,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9137174125179731,
+          "rmse": 1.901822820190188,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.9054054054054,
+          "mean_captain_points": 5.52972972972973
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9575165970092052,
+          "rmse": 1.8902937990820128,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.932432432432435,
+          "mean_captain_points": 5.275675675675676
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9351048350495309,
+          "rmse": 1.911426105394203,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.866216216216216,
+          "mean_captain_points": 5.005405405405406
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability+set_pieces+other_competitions+market"
+    },
+    {
+      "family": "regularized_linear",
+      "mae": 0.9420513769340618,
+      "rmse": 1.9087167295550522,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 38.98558558558558,
+      "mean_captain_points": 5.230630630630631,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9143048620359704,
+          "rmse": 1.906809235717824,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.40675675675676,
+          "mean_captain_points": 5.335135135135135
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9741340144789445,
+          "rmse": 1.89652269351061,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.733783783783785,
+          "mean_captain_points": 5.286486486486487
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9398051343164205,
+          "rmse": 1.9216885069843221,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.81621621621622,
+          "mean_captain_points": 5.07027027027027
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability+set_pieces+other_competitions+market"
+    },
+    {
+      "family": "catboost",
+      "mae": 0.9386963629822999,
+      "rmse": 1.902713129809328,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.07972972972973,
+      "mean_captain_points": 5.192342342342342,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9243262381985122,
+          "rmse": 1.9054397433565813,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.567567567567565,
+          "mean_captain_points": 5.27972972972973
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9614329828298093,
+          "rmse": 1.893002628865367,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.84594594594594,
+          "mean_captain_points": 5.286486486486487
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9319192029570669,
+          "rmse": 1.9089137377654288,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.825675675675676,
+          "mean_captain_points": 5.010810810810811
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability+set_pieces+other_competitions+market"
+    }
+  ],
+  "ablations": [
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.8995637119991038,
+      "rmse": 1.905199617644895,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.13153153153153,
+      "mean_captain_points": 5.227927927927928,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.8772871908005472,
+          "rmse": 1.9013396745918854,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.77972972972973,
+          "mean_captain_points": 5.458108108108108
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9237576959537647,
+          "rmse": 1.8952000513208536,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.872972972972974,
+          "mean_captain_points": 5.3
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.8991945984246307,
+          "rmse": 1.9180805032218529,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.74189189189189,
+          "mean_captain_points": 4.925675675675675
+        }
+      ],
+      "feature_set": "base"
+    },
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9020131801002644,
+      "rmse": 1.9082650223501731,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.038288288288285,
+      "mean_captain_points": 5.132432432432433,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.8838549921480323,
+          "rmse": 1.9091170362521388,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.567567567567565,
+          "mean_captain_points": 5.322972972972973
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9235465584414685,
+          "rmse": 1.8955818751303535,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.8054054054054,
+          "mean_captain_points": 5.128378378378378
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9000501921994577,
+          "rmse": 1.9189940586067755,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.74189189189189,
+          "mean_captain_points": 4.945945945945946
+        }
+      ],
+      "feature_set": "base+team_xg"
+    },
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9350977162450652,
+      "rmse": 1.9020158715650533,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.107657657657654,
+      "mean_captain_points": 5.219369369369369,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9128495967495105,
+          "rmse": 1.901493527603353,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.71351351351351,
+          "mean_captain_points": 5.441891891891892
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.96124923490431,
+          "rmse": 1.8917994069925201,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.93378378378378,
+          "mean_captain_points": 5.335135135135135
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9329053852743205,
+          "rmse": 1.9118471467018106,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.67567567567568,
+          "mean_captain_points": 4.881081081081081
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability"
+    },
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9331842950688326,
+      "rmse": 1.901135134122443,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.18153153153153,
+      "mean_captain_points": 5.2468468468468465,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9078281979292592,
+          "rmse": 1.9005028838315876,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.87837837837838,
+          "mean_captain_points": 5.4972972972972975
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9606668715374066,
+          "rmse": 1.891169784529377,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.954054054054055,
+          "mean_captain_points": 5.305405405405406
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9328155702743915,
+          "rmse": 1.910845539696762,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.712162162162166,
+          "mean_captain_points": 4.937837837837838
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability+set_pieces"
+    },
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9340834137288836,
+      "rmse": 1.9006985316291294,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.233333333333334,
+      "mean_captain_points": 5.295495495495495,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9137174125179731,
+          "rmse": 1.901822820190188,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.9054054054054,
+          "mean_captain_points": 5.52972972972973
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9575165970092052,
+          "rmse": 1.8902937990820128,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.932432432432435,
+          "mean_captain_points": 5.275675675675676
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9325406380486142,
+          "rmse": 1.909095176103919,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.862162162162164,
+          "mean_captain_points": 5.081081081081081
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability+set_pieces+other_competitions"
+    },
+    {
+      "family": "hist_gradient_boosting",
+      "mae": 0.9349686204926615,
+      "rmse": 1.9015070864278232,
+      "baseline_mae": 1.060161520599956,
+      "rows": 84984,
+      "squads": 2220,
+      "mean_lineup_points": 39.23468468468469,
+      "mean_captain_points": 5.27027027027027,
+      "folds": [
+        {
+          "season": 2023,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9137174125179731,
+          "rmse": 1.901822820190188,
+          "baseline_mae": 1.0368147864615955,
+          "rows": 28738,
+          "squads": 740,
+          "mean_lineup_points": 38.9054054054054,
+          "mean_captain_points": 5.52972972972973
+        },
+        {
+          "season": 2024,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9575165970092052,
+          "rmse": 1.8902937990820128,
+          "baseline_mae": 1.0702795946682522,
+          "rows": 26908,
+          "squads": 740,
+          "mean_lineup_points": 38.932432432432435,
+          "mean_captain_points": 5.275675675675676
+        },
+        {
+          "season": 2025,
+          "first_gameweek": 1,
+          "last_gameweek": 38,
+          "mae": 0.9351048350495309,
+          "rmse": 1.911426105394203,
+          "baseline_mae": 1.073750766923444,
+          "rows": 29338,
+          "squads": 740,
+          "mean_lineup_points": 39.866216216216216,
+          "mean_captain_points": 5.005405405405406
+        }
+      ],
+      "feature_set": "base+team_xg+fpl_availability+set_pieces+other_competitions+market"
+    }
+  ],
+  "feature_coverage": {
+    "team_xg": {
+      "usable": true,
+      "columns": [
+        "team_xg_for_6",
+        "team_xg_for_20",
+        "team_xg_for_last_season",
+        "team_xg_against_6",
+        "team_xg_against_20",
+        "team_xg_against_last_season",
+        "opponent_xg_for_6",
+        "opponent_xg_for_20",
+        "opponent_xg_for_last_season",
+        "opponent_xg_against_6",
+        "opponent_xg_against_20",
+        "opponent_xg_against_last_season",
+        "opponent_xg_for_venue",
+        "opponent_xg_against_venue"
+      ],
+      "folds": [
+        {
+          "season": 2023,
+          "training_rows": 17346,
+          "test_rows": 29721,
+          "total_test_rows": 29721,
+          "varying_training_columns": 10
+        },
+        {
+          "season": 2024,
+          "training_rows": 47067,
+          "test_rows": 27271,
+          "total_test_rows": 27271,
+          "varying_training_columns": 14
+        },
+        {
+          "season": 2025,
+          "training_rows": 74338,
+          "test_rows": 29747,
+          "total_test_rows": 29747,
+          "varying_training_columns": 14
+        }
+      ]
+    },
+    "fpl_availability": {
+      "usable": true,
+      "columns": [
+        "flag_probability",
+        "flag_age_days"
+      ],
+      "folds": [
+        {
+          "season": 2023,
+          "training_rows": 55532,
+          "test_rows": 29542,
+          "total_test_rows": 29721,
+          "varying_training_columns": 2
+        },
+        {
+          "season": 2024,
+          "training_rows": 85074,
+          "test_rows": 27150,
+          "total_test_rows": 27271,
+          "varying_training_columns": 2
+        },
+        {
+          "season": 2025,
+          "training_rows": 112224,
+          "test_rows": 29644,
+          "total_test_rows": 29747,
+          "varying_training_columns": 2
+        }
+      ]
+    },
+    "set_pieces": {
+      "usable": true,
+      "columns": [
+        "penalty_order",
+        "direct_fk_order",
+        "corner_fk_order"
+      ],
+      "folds": [
+        {
+          "season": 2023,
+          "training_rows": 55532,
+          "test_rows": 29542,
+          "total_test_rows": 29721,
+          "varying_training_columns": 3
+        },
+        {
+          "season": 2024,
+          "training_rows": 85074,
+          "test_rows": 27150,
+          "total_test_rows": 27271,
+          "varying_training_columns": 3
+        },
+        {
+          "season": 2025,
+          "training_rows": 112224,
+          "test_rows": 29644,
+          "total_test_rows": 29747,
+          "varying_training_columns": 3
+        }
+      ]
+    },
+    "predicted_minutes": {
+      "usable": false,
+      "columns": [
+        "expected_minutes",
+        "predicted_start_probability"
+      ],
+      "folds": [
+        {
+          "season": 2023,
+          "training_rows": 0,
+          "test_rows": 0,
+          "total_test_rows": 29721,
+          "varying_training_columns": 0
+        },
+        {
+          "season": 2024,
+          "training_rows": 0,
+          "test_rows": 0,
+          "total_test_rows": 27271,
+          "varying_training_columns": 0
+        },
+        {
+          "season": 2025,
+          "training_rows": 0,
+          "test_rows": 0,
+          "total_test_rows": 29747,
+          "varying_training_columns": 0
+        }
+      ]
+    },
+    "other_competitions": {
+      "usable": true,
+      "columns": [
+        "other_matches_7",
+        "other_matches_14",
+        "days_since_other_match"
+      ],
+      "folds": [
+        {
+          "season": 2023,
+          "training_rows": 38425,
+          "test_rows": 29721,
+          "total_test_rows": 29721,
+          "varying_training_columns": 3
+        },
+        {
+          "season": 2024,
+          "training_rows": 68146,
+          "test_rows": 27271,
+          "total_test_rows": 27271,
+          "varying_training_columns": 3
+        },
+        {
+          "season": 2025,
+          "training_rows": 95417,
+          "test_rows": 29747,
+          "total_test_rows": 29747,
+          "varying_training_columns": 3
+        }
+      ]
+    },
+    "market": {
+      "usable": true,
+      "columns": [
+        "market_team_xg",
+        "market_opponent_xg",
+        "market_team_clean_sheet",
+        "market_opponent_clean_sheet"
+      ],
+      "folds": [
+        {
+          "season": 2023,
+          "training_rows": 0,
+          "test_rows": 0,
+          "total_test_rows": 29721,
+          "varying_training_columns": 0
+        },
+        {
+          "season": 2024,
+          "training_rows": 0,
+          "test_rows": 21809,
+          "total_test_rows": 27271,
+          "varying_training_columns": 0
+        },
+        {
+          "season": 2025,
+          "training_rows": 21809,
+          "test_rows": 29338,
+          "total_test_rows": 29747,
+          "varying_training_columns": 4
+        }
+      ]
+    }
+  },
+  "availability_policy": "Apply the archived flag as a multiplier when it is absent from model features.",
+  "baseline": {
+    "mae": 1.060161520599956,
+    "rmse": 2.10317548644411,
+    "squads": 2220,
+    "mean_lineup_points": 36.87792792792793,
+    "mean_captain_points": 4.427477477477478
+  },
+  "replay": {
+    "source": "reconstructed from prior appearances and timestamped rosters when available",
+    "squads_per_round": 20,
+    "seed": 61117,
+    "rounds": 111,
+    "score": "XI plus captain; no automatic substitutions or vice-captain fallback"
+  }
+}
