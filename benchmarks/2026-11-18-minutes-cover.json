@@ -1,0 +1,112 @@
+{
+  "single_appearance_estimate": {
+    "family": "hist_gradient_boosting",
+    "mae": 0.9339937029619866,
+    "rmse": 1.9006249033698845,
+    "baseline_mae": 1.060161520599956,
+    "rows": 84984,
+    "squads": 2220,
+    "mean_lineup_points": 39.237387387387386,
+    "mean_captain_points": 5.288288288288288,
+    "folds": [
+      {
+        "season": 2023,
+        "first_gameweek": 1,
+        "last_gameweek": 38,
+        "mae": 0.9137584046413996,
+        "rmse": 1.9018482449991052,
+        "baseline_mae": 1.0368147864615955,
+        "rows": 28738,
+        "squads": 740,
+        "mean_lineup_points": 38.9054054054054,
+        "mean_captain_points": 5.52972972972973
+      },
+      {
+        "season": 2024,
+        "first_gameweek": 1,
+        "last_gameweek": 38,
+        "mae": 0.9575165970092052,
+        "rmse": 1.8902937990820128,
+        "baseline_mae": 1.0702795946682522,
+        "rows": 26908,
+        "squads": 740,
+        "mean_lineup_points": 38.932432432432435,
+        "mean_captain_points": 5.275675675675676
+      },
+      {
+        "season": 2025,
+        "first_gameweek": 1,
+        "last_gameweek": 38,
+        "mae": 0.9322406172068046,
+        "rmse": 1.9088580128858446,
+        "baseline_mae": 1.073750766923444,
+        "rows": 29338,
+        "squads": 740,
+        "mean_lineup_points": 39.87432432432433,
+        "mean_captain_points": 5.059459459459459
+      }
+    ],
+    "score_calibration": {
+      "squads": 2220,
+      "xi_captain_mae": 10.11012807558261,
+      "with_cover_mae": 10.133672320582214,
+      "xi_captain_bias": -1.7693181819801687,
+      "with_cover_bias": -0.5982615264639347
+    }
+  },
+  "minutes_bands": {
+    "family": "hist_gradient_boosting",
+    "mae": 0.9321431104311799,
+    "rmse": 1.9010537091967663,
+    "baseline_mae": 1.060161520599956,
+    "rows": 84984,
+    "squads": 2220,
+    "mean_lineup_points": 39.05135135135135,
+    "mean_captain_points": 5.156306306306306,
+    "folds": [
+      {
+        "season": 2023,
+        "first_gameweek": 1,
+        "last_gameweek": 38,
+        "mae": 0.9162648080758559,
+        "rmse": 1.9040247051212513,
+        "baseline_mae": 1.0368147864615955,
+        "rows": 28738,
+        "squads": 740,
+        "mean_lineup_points": 38.60405405405405,
+        "mean_captain_points": 5.32027027027027
+      },
+      {
+        "season": 2024,
+        "first_gameweek": 1,
+        "last_gameweek": 38,
+        "mae": 0.9598332915578398,
+        "rmse": 1.8903915636745223,
+        "baseline_mae": 1.0702795946682522,
+        "rows": 26908,
+        "squads": 740,
+        "mean_lineup_points": 38.722972972972975,
+        "mean_captain_points": 5.1635135135135135
+      },
+      {
+        "season": 2025,
+        "first_gameweek": 1,
+        "last_gameweek": 38,
+        "mae": 0.9223000147645068,
+        "rmse": 1.9078805431885113,
+        "baseline_mae": 1.073750766923444,
+        "rows": 29338,
+        "squads": 740,
+        "mean_lineup_points": 39.82702702702703,
+        "mean_captain_points": 4.985135135135135
+      }
+    ],
+    "score_calibration": {
+      "squads": 2220,
+      "xi_captain_mae": 10.028630566665443,
+      "with_cover_mae": 10.073219241329484,
+      "xi_captain_bias": -1.6538686130082996,
+      "with_cover_bias": -0.5081476539116708
+    }
+  }
+}

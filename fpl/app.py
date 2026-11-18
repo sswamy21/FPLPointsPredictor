@@ -17,6 +17,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.exceptions import HTTPException
 
 from . import congestion, data, markets, model, player_workload, snapshots
+from .gameweek_value import evaluate_gameweek
 from .lineup import POSITION_IDS, SquadError, demo_squad, optimize, resolve_upload
 from .transfers import recommend_transfers
 
@@ -373,6 +374,7 @@ def create_app(cache=None, *, warm=True):
             kind, label = "upload", filename[:180]
 
         result = optimize(ids, snapshot.projections)
+        result["evaluation"] = evaluate_gameweek(result)
         result.update(snapshot_details(snapshot), source={"type": kind, "label": label, "gameweek": pick_gameweek})
         result["transfer_gameweeks"] = list(snapshot.projections_by_week)
         if kind == "manager":

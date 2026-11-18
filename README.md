@@ -37,7 +37,7 @@ python -m fpl optimize --manager 123456 --refresh
 
 Load a squad, then open **Transfer targets** below the bench. Enter your cash in the bank and remaining free transfers. The app compares the next five Gameweeks by default, or all remaining rounds if fewer are scheduled. You can choose a shorter horizon or select someone to sell. For exact affordability, copy your players’ selling prices from the FPL Transfers page. Missing values use current market prices as estimates and the affected recommendations are marked.
 
-Each result is an alternative single transfer. The app tests same-position replacements within your budget and the three-per-club limit, then re-optimizes the XI and captain in each selected round. A transfer with zero free transfers costs four points. The ranking uses total projected XI and captain gain after that hit, so a high-scoring player can still be a poor transfer if they would mostly sit on your bench. When no swap has a positive net gain, the app recommends holding. [Official transfer and selling-price rules](https://www.premierleague.com/en/news/2174907)
+Each result is an alternative single transfer. The app tests same-position replacements within your budget and the three-per-club limit, then re-optimizes the XI and captain in each selected round. It ranks the moves by projected points, including legal autosubs and vice-captain cover, after the four-point hit when you have zero free transfers. When no swap has a positive net gain, the app recommends holding. [Official transfer and selling-price rules](https://www.premierleague.com/en/news/2174907)
 
 Later rounds use today’s player form and the scheduled opposition. Upcoming availability flags only apply to their own Gameweek, so check team news for injuries and suspensions that could extend further. The recommendations use your current bank and prices and leave the decision and FPL submission to you.
 
@@ -47,9 +47,9 @@ The model learns from the [historical FPL archive](https://github.com/vaastav/Fa
 
 Features come from completed prior Gameweeks. Results become eligible three hours after kickoff. The model uses 3-, 6-, and 20-fixture player form, venue, rest, and a difficulty estimate based on previous team and opponent results. Archived FPL snapshots recover official deadlines, availability and set-piece roles where available. The app can also use team xG, cup and European workload, and deadline-stamped market or minutes estimates. [Forecast methodology and validation](METHODOLOGY.md)
 
-In doubles, fixture projections are summed. In blanks, the projection is zero. The player details display the official upcoming fixture difficulty.
+In doubles, fixture points and expected minutes are summed. In blanks, both are zero. The player details display expected minutes, the chances of playing and reaching 60 minutes, and the official upcoming fixture difficulty.
 
-The optimizer checks every legal formation. The projected score is the sum of the starting XI plus one extra copy of the highest-projected starter’s points. The second-highest starter is vice-captain. All four bench players are shown in points order, with the reserve goalkeeper labeled separately from the three outfield substitution priorities. [Official formation and captaincy rules](https://www.premierleague.com/en/news/2174899/1000)
+The optimizer checks every legal formation and selects the XI with the highest sum of starter points and captain bonus. The two highest-projected starters are captain and vice-captain. The projected total then includes expected cover from the selected bench and vice-captain, broken out under the pitch. Bench players are shown in points order, with the reserve goalkeeper labeled separately from the three outfield substitution priorities. [Official formation and captaincy rules](https://www.premierleague.com/en/news/2174899/1000)
 
 ## Verification
 

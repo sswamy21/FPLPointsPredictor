@@ -12,9 +12,13 @@ All learned features use information available before the Gameweek deadline. Res
 
 ## Forecast and scoring
 
-The forecast multiplies a player’s expected points conditional on appearing by their estimated probability of appearing. The availability classifier also estimates the chance of starting and reaching 60 minutes. A model trained with timestamped FPL availability learns how to interpret the flag and news age. Where availability inputs are unavailable to the fitted model, the live forecast uses the official flag as a multiplier. Each fixture is projected independently and Gameweek totals add the scheduled fixtures. A blank contributes zero.
+The availability classifier estimates the probabilities of missing the match or playing in one of four categories defined by starting status and the 60-minute threshold. Expected minutes weight each category’s historical mean minutes by its predicted probability. Those category means come from the training fold only. A model trained with timestamped FPL availability learns how to interpret the flag and news age. Where availability inputs are unavailable to the fitted model, the live forecast uses the official flag as a multiplier. Each fixture is projected separately and Gameweek totals add the scheduled fixtures. A blank contributes zero. [FPL Review expected-minutes methodology](https://docs.fplreview.com/the-model/projections/xmins/)
 
-Transfer recommendations use the same forecast and lineup objective over the next five scheduled rounds by default, with shorter horizons available. Each round uses its own fixture schedule with form frozen at the upcoming deadline. The live FPL availability flag applies to the upcoming round. The optimizer compares each affordable single swap with holding the current squad, picks a fresh XI and captain for each round, and subtracts any transfer hit once. Enter the FPL selling prices to account for the sell-on rule. A market-price estimate can overstate available funds when a player has risen in value.
+The live points model multiplies expected points conditional on an appearance by the probability of appearing. The minutes-band experiment estimates points separately for appearances below 60 minutes and appearances of 60 minutes or more. It weights those scoring estimates by the two predicted probabilities and gives the no-appearance case zero. Observed target minutes are used as training labels for those categories.
+
+Transfer recommendations evaluate the next five scheduled rounds by default, with shorter horizons available. Each round uses its own fixture schedule with form frozen at the upcoming deadline. The live FPL availability flag applies to the upcoming round. The optimizer compares each affordable single swap with holding the current squad, picks a fresh XI and captain for each round, and subtracts any transfer hit once. Enter the FPL selling prices to account for the sell-on rule. A market-price estimate can overstate available funds when a player has risen in value.
+
+For each selected lineup, the squad forecast adds expected points from the reserve goalkeeper, eligible outfield substitutes and the vice-captain. Outfield estimates average over the possible absence counts by position and the possible bench appearances, in bench-priority order and subject to the formation minimums. A substitute’s projected points already include their appearance probability, so their points are conditioned on playing before weighting by the chance they actually come off the bench. The XI and captain are still chosen by raw XI-plus-captain points. Squad evaluation assumes independent appearances, including for goalkeepers from the same club. [FPL Review solver evaluation](https://docs.fplreview.com/the-model/solvers/evaluation-score/) · [Official FPL lineup rules](https://www.premierleague.com/en/news/2174899)
 
 The historical comparison uses expanding-season training and three full-season holdouts. All model families use the same evaluation rows and eligible feature columns in each fold. The cumulative feature comparison adds one data group at a time using histogram gradient boosting. A feature group needs varying training data and observed test data in at least one fold to enter the comparison. Market coverage must be read per fold because the pre-deadline price archive starts in 2024/25.
 
@@ -54,6 +58,18 @@ python -m fpl benchmark --family hist_gradient_boosting --seasons 2025 --focus-g
 ```
 
 Machine-readable reports are in [the benchmark directory](benchmarks/).
+
+## November 18, 2026 minutes and squad-cover comparison
+
+The replay used 84,984 player-Gameweeks and 2,220 reconstructed squads across the same three held-out seasons. The live points model had **0.934 MAE** and scored **39.24 realized XI-plus-captain points** per replayed lineup. The minutes-band version had **0.932 MAE** and scored **39.05** per lineup. The dashboard keeps the existing points model because it led on the lineup measure.
+
+Against realized scores for the same chosen XIs, including their actual autosubs and captaincy fallback, the old projected total underestimated scores by **1.77 points** on average. Adding the expected cover reduced that to **0.60 points**. Mean absolute team error moved from **10.11 to 10.13 points**. This comparison tests score calibration for a fixed lineup and bench order. The transfer planner uses the adjusted points to account for the expected contribution of squad depth.
+
+Rerun the comparison on the same chronological holdouts or read the [recorded results](benchmarks/2026-11-18-minutes-cover.json).
+
+```console
+python -m fpl benchmark --compare-minutes --output minutes-cover.json
+```
 
 ## Optional inputs
 

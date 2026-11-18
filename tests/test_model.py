@@ -4,7 +4,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
-from fpl.model import FPLModel, FeatureHistory, _evaluate, _observations, forecast, forecast_gameweeks
+from fpl.model import FPLModel, FeatureHistory, _evaluate, _observations, _predict_fixtures, forecast, forecast_gameweeks
 
 
 def match(fixture, gameweek, kickoff, home=1, away=2, points=2, finished=True, season=2026):
@@ -158,6 +158,25 @@ class FeatureHistoryTests(unittest.TestCase):
 
 
 class ForecastTests(unittest.TestCase):
+    def test_minutes_bands_blend_conditional_points_and_expected_minutes(self):
+        class MixedMinutes:
+            classes_ = np.arange(5)
+
+            def predict_proba(self, inputs):
+                return np.array([[0.1, 0.3, 0.2, 0.1, 0.3]])
+
+        class BandPoints:
+            def predict(self, inputs):
+                return 1 + 5 * inputs["played_60"].to_numpy()
+
+        fitted = FPLModel(MixedMinutes(), BandPoints(), ("home",), {}, 1, [2026],
+                          minutes_by_outcome={0: 0, 1: 20, 2: 40, 3: 70, 4: 90}, points_by_minutes_band=True)
+        scored = _predict_fixtures(fitted, pd.DataFrame({"home": [1]})).iloc[0]
+        self.assertAlmostEqual(scored["points"], 2.9)
+        self.assertAlmostEqual(scored["minutes"], 48)
+        self.assertAlmostEqual(scored["appearance"], 0.9)
+        self.assertAlmostEqual(scored["sixty"], 0.4)
+
     def test_transfer_horizon_uses_one_information_cutoff_and_round_specific_availability(self):
         prior = match(1, 1, "2026-08-08 15:00")
         upcoming = match(2, 3, "2026-08-22 15:00", finished=False)

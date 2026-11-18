@@ -118,6 +118,18 @@ def test_hold_when_gross_gain_only_covers_the_hit():
     assert result["candidates"] == []
 
 
+def test_ranks_a_bench_upgrade_by_its_expected_autosub_points():
+    squad, elements = market()
+    add_player(elements, 16, position=1)
+    points = projections(elements, {1: 3, 2: 2, 16: 2.8})
+    points[11][1]["appearance_chance"] = 0.5
+    result = recommend_transfers(squad, points, elements, bank=0, free_transfers=1, outgoing_id=2)
+    target = result["candidates"][0]
+    assert target["incoming"]["id"] == 16
+    assert not target["weeks"][0]["starts"]
+    assert target["net_gain"] == pytest.approx(0.4)
+
+
 @pytest.mark.parametrize("override, message", [
     ({"bank": -1}, "bank"),
     ({"free_transfers": 6}, "free transfers"),

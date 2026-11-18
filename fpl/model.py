@@ -14,7 +14,7 @@ from .data import player_identity
 from .player_workload import FEATURES as WORKLOAD_FEATURES, workload_features
 
 
-MODEL_VERSION = 3
+MODEL_VERSION = 4
 RESULT_LAG = pd.Timedelta(hours=3)
 DEADLINE_OFFSET = pd.Timedelta(minutes=90)
 POSITION = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -274,6 +274,7 @@ def _observations(builder, as_of=None):
         snapshot = builder.snapshot(targets, season, gameweek, cutoff)
         snapshot["_cutoff"] = cutoff
         snapshot["_outcome"] = targets[["appearance", "start", "sixty"]].dot(np.array([1, 1, 2]))
+        snapshot["_minutes"] = targets["minutes"]
         snapshot[["_observed", "_event", "_season", "_gameweek", "_player", "_points"]] = targets[
             ["_observed", "_event", "season", "gameweek", "player", "points"]
         ]
@@ -292,9 +293,11 @@ class FPLModel:
     training_rows: int
     training_seasons: list[int]
     version: int = MODEL_VERSION
+    minutes_by_outcome: dict | None = None
+    points_by_minutes_band: bool = False
 
 
-def _fit(observations, features):
+def _fit(observations, features, *, points_by_minutes_band=False):
     appearances = observations["_outcome"] > 0
     if not appearances.any():
         raise ValueError("Training requires at least one recorded player appearance.")
@@ -312,24 +315,35 @@ def _fit(observations, features):
     )
     with threadpool_limits(limits=4):
         availability.fit(inputs, classes)
-        points.fit(inputs.loc[appearances], observations.loc[appearances, "_points"])
+        scoring_inputs = inputs.loc[appearances]
+        if points_by_minutes_band:
+            scoring_inputs = scoring_inputs.assign(played_60=classes.loc[appearances].ge(3).astype(int))
+        points.fit(scoring_inputs, observations.loc[appearances, "_points"])
+    minutes = observations.groupby("_outcome")["_minutes"].mean().to_dict() if "_minutes" in observations else None
     return FPLModel(
         availability, points, features, {}, len(observations),
         sorted(observations["_season"].astype(int).unique().tolist()),
+        minutes_by_outcome=minutes, points_by_minutes_band=points_by_minutes_band,
     )
 
 
 def _predict_fixtures(model, inputs):
     inputs = inputs[list(model.feature_columns)]
+    classes = model.availability.classes_
     with threadpool_limits(limits=4):
         probabilities = model.availability.predict_proba(inputs)
-        raw_points = model.points_if_appearing.predict(inputs)
-    classes = model.availability.classes_
-    appeared = probabilities[:, classes > 0].sum(axis=1)
+        appeared = probabilities[:, classes > 0].sum(axis=1)
+        sixty = probabilities[:, classes >= 3].sum(axis=1)
+        if model.points_by_minutes_band:
+            short = model.points_if_appearing.predict(inputs.assign(played_60=0))
+            long = model.points_if_appearing.predict(inputs.assign(played_60=1))
+            points = short * (appeared - sixty) + long * sixty
+        else:
+            points = model.points_if_appearing.predict(inputs) * appeared
     started = probabilities[:, np.isin(classes, [2, 4])].sum(axis=1)
-    sixty = probabilities[:, classes >= 3].sum(axis=1)
+    minutes = None if model.minutes_by_outcome is None else probabilities @ [model.minutes_by_outcome[c] for c in classes]
     return pd.DataFrame({
-        "points": raw_points * appeared, "appearance": appeared, "start": started, "sixty": sixty,
+        "points": points, "appearance": appeared, "start": started, "sixty": sixty, "minutes": minutes,
     }, index=inputs.index)
 
 
@@ -472,6 +486,7 @@ def _forecast_round(model, builder, bootstrap, season, gameweek, deadline, infor
                 "fixture_id": int(match["fixture"]), "home": bool(match["home"]),
                 "opponent": _team_label(opponent), "opponent_name": opponent.get("name", _team_label(opponent)),
                 "points": float(match["points"]) * multiplier,
+                "expected_minutes": float(match["minutes"]) * multiplier if pd.notna(match["minutes"]) else None,
                 "difficulty": int(match["difficulty"]) if pd.notna(match["difficulty"]) else None,
                 "kickoff": match["kickoff"].isoformat() if pd.notna(match["kickoff"]) else None,
             })
@@ -482,6 +497,8 @@ def _forecast_round(model, builder, bootstrap, season, gameweek, deadline, infor
             "team_name": club.get("name", _team_label(club)), "team_id": element["team"],
             "price": element.get("now_cost"),
             "points": math.fsum(detail["points"] for detail in fixture_details), "fixtures": fixture_details,
+            "expected_minutes": math.fsum(detail["expected_minutes"] for detail in fixture_details)
+            if all(detail["expected_minutes"] is not None for detail in fixture_details) else None,
             "appearance_chance": _at_least_one(player_fixtures, "appearance", multiplier),
             "start_chance": _at_least_one(player_fixtures, "start", multiplier),
             "sixty_chance": _at_least_one(player_fixtures, "sixty", multiplier),

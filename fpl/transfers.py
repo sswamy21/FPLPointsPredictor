@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 from math import fsum
 
 from . import TRANSFER_HORIZON
+from .gameweek_value import evaluate_gameweek
 from .lineup import POSITION_IDS, SquadError, optimize
 
 
@@ -49,7 +50,7 @@ def recommend_transfers(squad_ids, projections_by_week, elements, *, bank, free_
         raise SquadError(f"Choose between 1 and {TRANSFER_HORIZON} Gameweeks for transfer projections.")
 
     weeks = sorted(projections_by_week.items())
-    baseline = {week: optimize(squad_ids, projections)["projected_points"] for week, projections in weeks}
+    baseline = {week: evaluate_gameweek(optimize(squad_ids, projections))["points"] for week, projections in weeks}
     owned_ids = set(squad_ids)
     if outgoing_id is not None and outgoing_id not in owned_ids:
         raise SquadError("Choose a player from your squad to transfer out.")
@@ -97,7 +98,7 @@ def recommend_transfers(squad_ids, projections_by_week, elements, *, bank, free_
             lineups = [(week, optimize(swapped, projections)) for week, projections in weeks]
             results = []
             for week, lineup in lineups:
-                total = lineup["projected_points"]
+                total = evaluate_gameweek(lineup)["points"]
                 starter = next((player for player in lineup["starters"] if player["id"] == buy_id), None)
                 results.append({
                     "gameweek": week, "baseline_points": baseline[week], "projected_points": total,

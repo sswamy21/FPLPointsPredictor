@@ -31,10 +31,13 @@ def _check_lineup(result, status):
     assert result["projected_points"] == pytest.approx(
         fsum(player["points"] for player in starters) + ranking[0]["points"]
     )
+    value = result["evaluation"]
+    assert value["points"] == pytest.approx(result["projected_points"] + value["autosub_points"] + value["vice_captain_points"])
     bench_scores = [player["points"] for player in result["bench"]]
     assert bench_scores == sorted(bench_scores, reverse=True)
     for player in players:
         assert player["points"] == pytest.approx(fsum(game["points"] for game in player["fixtures"]))
+        assert player["expected_minutes"] == pytest.approx(fsum(game["expected_minutes"] for game in player["fixtures"]))
 
 
 def test_upload_and_manager_against_live_fpl():
@@ -90,7 +93,7 @@ def test_transfer_search_against_live_fpl():
             assert target["incoming"]["position"] == target["outgoing"]["position"]
             assert target["bank_after"] == 50 + target["sale_price"] - target["incoming"]["price"] >= 0
             assert not target["estimated_sale_price"]
-            assert target["weeks"][0]["baseline_points"] == pytest.approx(lineup["projected_points"])
+            assert target["weeks"][0]["baseline_points"] == pytest.approx(lineup["evaluation"]["points"])
             assert target["net_gain"] == pytest.approx(fsum(week["gain"] for week in target["weeks"]) - hit)
     shorter = requests.post(f"{SERVER}/api/transfers", json=dict(payload, horizon=1), timeout=30)
     shorter.raise_for_status()

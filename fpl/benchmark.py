@@ -13,8 +13,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from threadpoolctl import threadpool_limits
 
+from .gameweek_value import evaluate_gameweek
 from .lineup import SQUAD_COUNTS, optimize
-from .model import FPLModel, _fit, _historical_appearances, _predict_fixtures, _scores
+from .model import FEATURE_GROUPS, FPLModel, _fit, _historical_appearances, _predict_fixtures, _scores
 
 FAMILIES = ("hist_gradient_boosting", "regularized_linear", "catboost")
 SEED = 61117
@@ -207,7 +208,40 @@ def _coverage(folds, columns):
     }
 
 
-def _evaluate_candidate(folds, features, family, squads, progress):
+def _cover_accuracy(totals, squads):
+    """Compare scores for the same chosen lineups against their realized FPL cover."""
+    errors = []
+    for key, group in totals.groupby(level=["_season", "_gameweek"]):
+        players = group.droplevel(["_season", "_gameweek"]).to_dict("index")
+
+        def realized(player):
+            actual = players.get(player["id"], {})
+            return dict(player, points=actual.get("_points", 0.0),
+                        appearance_chance=float(actual.get("_appeared", False)))
+
+        for squad in squads.get(key, ()):
+            projections = {
+                player: {"id": player, "position": position, "points": players.get(player, {}).get("prediction", 0.0),
+                         "appearance_chance": 1 - players.get(player, {}).get("_no_show", 1.0)}
+                for player, position in squad.items()
+            }
+            lineup = optimize(list(squad), projections)
+            starters = [realized(player) for player in lineup["starters"]]
+            captain = next(player for player in starters if player["role"] == "C")
+            actual_lineup = {"starters": starters, "bench": [realized(player) for player in lineup["bench"]],
+                             "goalkeeper": realized(lineup["goalkeeper"]),
+                             "projected_points": fsum(player["points"] for player in starters) + captain["points"]}
+            actual_points = evaluate_gameweek(actual_lineup)["points"]
+            errors.append((lineup["projected_points"] - actual_points, evaluate_gameweek(lineup)["points"] - actual_points))
+    if not errors:
+        return {}
+    error = np.asarray(errors)
+    return {"squads": len(errors), "xi_captain_mae": float(abs(error[:, 0]).mean()),
+            "with_cover_mae": float(abs(error[:, 1]).mean()), "xi_captain_bias": float(error[:, 0].mean()),
+            "with_cover_bias": float(error[:, 1].mean())}
+
+
+def _evaluate_candidate(folds, features, family, squads, progress, *, minutes_bands=False, evaluate_cover=False):
     results, seasons = [], []
     for season, train, test in folds:
         progress(f"Fitting {family} on {len(train):,} rows for {season}/{str(season + 1)[-2:]}.")
@@ -216,15 +250,25 @@ def _evaluate_candidate(folds, features, family, squads, progress):
         fold_features = tuple(varying.index[varying])
         if not fold_features:
             raise ValueError(f"No training feature varies for the {season} validation fold.")
-        model = fit_candidate(train, fold_features, family)
+        model = _fit(train, fold_features, points_by_minutes_band=True) if minutes_bands else fit_candidate(train, fold_features, family)
         # Cast once so sklearn pipelines and CatBoost receive the same numeric representation.
         inputs = test[list(model.feature_columns)].astype(float)
-        prediction = _predict_fixtures(model, inputs)["points"]
+        fixture_predictions = _predict_fixtures(model, inputs)
+        prediction = fixture_predictions["points"]
         if "flag_probability" in test and "flag_probability" not in model.feature_columns:
             # This is the same FPL flag multiplier used by the original live forecast.
             prediction *= test["flag_probability"].fillna(1.0)
         scored = test.assign(prediction=prediction)
-        totals = scored.groupby(["_season", "_gameweek", "_player"])[["_points", "prediction", "baseline"]].sum()
+        keys = ["_season", "_gameweek", "_player"]
+        groups = scored.groupby(keys)
+        totals = groups[["_points", "prediction", "baseline"]].sum()
+        if evaluate_cover:
+            appearances = scored.assign(_no_show=1 - fixture_predictions["appearance"],
+                                        _appeared=test["_outcome"].gt(0) | test["_points"].ne(0)).groupby(keys)
+            no_show = appearances["_no_show"].prod()
+            if "flag_probability" in test and "flag_probability" not in model.feature_columns:
+                no_show = 1 - (1 - no_show) * groups["flag_probability"].first().fillna(1)
+            totals = totals.assign(_no_show=no_show, _appeared=appearances["_appeared"].any())
         results.append(totals)
         seasons.append({
             "season": season, "first_gameweek": int(test["_gameweek"].min()),
@@ -235,7 +279,28 @@ def _evaluate_candidate(folds, features, family, squads, progress):
     return {
         "family": family, **_scores(totals), **_lineup_scores(totals, squads, "prediction"),
         "folds": seasons,
+        **({"score_calibration": _cover_accuracy(totals, squads)} if evaluate_cover else {}),
     }, totals
+
+
+def compare_minutes_bands(observations, history, player_context, seasons=None, progress=None):
+    """Compare the deployed inputs with and without separate short/long scoring estimates."""
+    progress = progress or (lambda _message: None)
+    folds = _folds(observations, seasons)
+    prior = _historical_appearances(history)
+    squads = {}
+    for _, _, test in folds:
+        squads.update(replay_squads(prior, test, player_context=player_context))
+    experimental = {column for group in ("market", "player_cup_workload", "predicted_minutes")
+                    for column in FEATURE_GROUPS[group]}
+    features = tuple(column for column in observations if not column.startswith("_")
+                     and column != "baseline" and column not in experimental)
+    report = {}
+    for name, conditioned in (("single_appearance_estimate", False), ("minutes_bands", True)):
+        progress(f"Evaluating {name.replace('_', ' ')}.")
+        report[name], _ = _evaluate_candidate(folds, features, FAMILIES[0], squads, progress,
+                                              minutes_bands=conditioned, evaluate_cover=True)
+    return report
 
 
 def run_benchmark(observations, *, history=None, player_context=None, feature_groups=None, families=FAMILIES,

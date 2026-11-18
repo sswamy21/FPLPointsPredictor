@@ -200,6 +200,11 @@ function openPlayer(player) {
     );
     fixtures.append(row);
   }
+  if (player.fixtures.length && Number.isFinite(player.expected_minutes)) {
+    const minutes = create("div", "fixture-row");
+    minutes.append(create("span", "", "Expected minutes"), create("strong", "", Math.round(player.expected_minutes)));
+    fixtures.append(minutes);
+  }
   const total = create("div", "fixture-row");
   total.append(
     create("span", "", player.fixtures.length ? "Gameweek projection" : "Blank Gameweek"),
@@ -314,8 +319,13 @@ function renderLineup(lineup) {
     source += ` · squad from GW ${lineup.source.gameweek}`;
   }
   byId("lineup-source").textContent = source;
-  byId("projected-score").textContent = points(lineup.projected_points);
-  showText("lineup-breakdown", `${points(lineup.starting_points)} starter pts + ${points(lineup.captain_bonus)} captain pts`);
+  byId("projected-score").textContent = points(lineup.evaluation?.points ?? lineup.projected_points);
+  const parts = [`${points(lineup.projected_points)} XI + captain`];
+  if (lineup.evaluation) {
+    parts.push(`${gainFormat.format(lineup.evaluation.autosub_points)} autosubs`,
+      `${gainFormat.format(lineup.evaluation.vice_captain_points)} vice-captain`);
+  }
+  showText("lineup-breakdown", parts.join(" · "));
   renderLineupWarning(lineup);
   renderTiles(lineup);
   renderTransferForm(lineup, previous);

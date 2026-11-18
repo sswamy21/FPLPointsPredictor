@@ -34,12 +34,13 @@ def main():
     ablation = benchmark.add_mutually_exclusive_group()
     ablation.add_argument("--exclude-group", action="append", choices=FEATURE_GROUPS, help="Omit a feature group.")
     ablation.add_argument("--focus-group", choices=FEATURE_GROUPS, help="Test one group with all other inputs fixed.")
+    ablation.add_argument("--compare-minutes", action="store_true", help="Compare short and long appearance scoring models.")
     commands.add_parser("warm-workload", help="Cache past cup and European player appearances.")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     if args.command == "benchmark":
-        from .benchmark import run_benchmark
+        from .benchmark import compare_minutes_bands, run_benchmark
         from .model import FeatureHistory, _observations
 
         store = DataStore(args.cache or os.environ.get("FPL_CACHE_DIR") or default_cache())
@@ -52,10 +53,13 @@ def main():
             observations = observations.drop(columns=list(groups.pop(group)))
         if args.focus_group:
             groups = {args.focus_group: groups[args.focus_group]}
-        report = run_benchmark(
-            observations, history=history, player_context=context["player_context"],
-            feature_groups=groups, families=args.family or FAMILIES, seasons=args.seasons, progress=logging.info,
-        )
+        if args.compare_minutes:
+            report = compare_minutes_bands(observations, history, context["player_context"], args.seasons, logging.info)
+        else:
+            report = run_benchmark(
+                observations, history=history, player_context=context["player_context"],
+                feature_groups=groups, families=args.family or FAMILIES, seasons=args.seasons, progress=logging.info,
+            )
         output = json.dumps(report, indent=2) + "\n"
         if args.output:
             args.output.write_text(output, encoding="utf-8", newline="\n")
