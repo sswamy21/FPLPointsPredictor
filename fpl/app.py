@@ -5,6 +5,7 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock, Thread
@@ -17,6 +18,7 @@ from werkzeug.exceptions import HTTPException
 
 from . import congestion, data, markets, model, player_workload, snapshots
 from .lineup import POSITION_IDS, SquadError, demo_squad, optimize, resolve_upload
+from .transfers import recommend_transfers
 
 LOGGER = logging.getLogger(__name__)
 PROJECT = Path(__file__).resolve().parent.parent
@@ -83,9 +85,13 @@ def _cached_model(cache, history, training_fixtures, deadline, context):
 @dataclass(frozen=True)
 class Snapshot:
     live: object
-    projections: dict
+    projections_by_week: dict
     coverage: dict
     metrics: dict
+
+    @property
+    def projections(self):
+        return self.projections_by_week[self.live.gameweek]
 
 
 class ForecastService:
@@ -112,14 +118,14 @@ class ForecastService:
             trained = _cached_model(
                 self.cache, history, training_fixtures, live.deadline, training_context(context, training_fixtures)
             )
-            predictions = model.forecast(
+            predictions = model.forecast_gameweeks(
                 trained, history, full_fixtures, live.bootstrap, live.season, live.gameweek, live.deadline, **context
             )
             expected_ids = {
                 player["id"] for player in live.bootstrap["elements"]
                 if player["element_type"] in POSITION_IDS
             }
-            missing = expected_ids - predictions.keys()
+            missing = expected_ids - predictions[live.gameweek].keys()
             if missing:
                 raise RuntimeError(f"The predictor omitted {len(missing)} official FPL players.")
             years = sorted(int(year) for year in history["season"].unique() if year < live.season)
@@ -261,6 +267,18 @@ def training_context(context, fixtures):
     }
 
 
+def _money(value, label):
+    try:
+        amount = Decimal(str(value))
+        if amount.is_finite() and 0 <= amount < 1000:
+            tenths = amount * 10
+            if tenths == tenths.to_integral_value():
+                return int(tenths)
+    except InvalidOperation:
+        pass
+    raise SquadError(f"Enter {label} in £m with at most one decimal place.")
+
+
 def create_app(cache=None, *, warm=True):
     app = Flask(__name__, static_folder="static", static_url_path="/assets")
     app.config.update(MAX_CONTENT_LENGTH=256 * 1024, TRUSTED_HOSTS=["127.0.0.1", "localhost"])
@@ -356,9 +374,46 @@ def create_app(cache=None, *, warm=True):
 
         result = optimize(ids, snapshot.projections)
         result.update(snapshot_details(snapshot), source={"type": kind, "label": label, "gameweek": pick_gameweek})
+        result["transfer_gameweeks"] = list(snapshot.projections_by_week)
         if kind == "manager":
             manager_warning = f"FPL publishes squads after each deadline. Imported the GW{pick_gameweek} squad. Upload a file to include transfers made since then."
             result["warning"] = " ".join(filter(None, (result["warning"], manager_warning)))
+        return jsonify(result)
+
+    @app.post("/api/transfers")
+    def transfer_targets():
+        payload = request.get_json()
+        if not isinstance(payload, dict):
+            raise SquadError("Send the current squad and transfer budget.")
+        snapshot = service.current()
+        if snapshot is None:
+            return jsonify(error=service.status()["message"] or "Forecast is loading."), 409
+        season, gameweek = season_label(snapshot.live.season), snapshot.live.gameweek
+        if payload.get("season") != season or payload.get("gameweek") != gameweek:
+            return jsonify(error="Re-optimize your squad for the current Gameweek, then search for transfers."), 409
+
+        ids = payload.get("squad_ids")
+        if not isinstance(ids, list) or len(ids) != 15 or any(type(player) is not int for player in ids):
+            raise SquadError("Supply the 15 FPL player IDs in your current squad.")
+        horizon = payload.get("horizon", len(snapshot.projections_by_week))
+        if type(horizon) is not int or not 1 <= horizon <= len(snapshot.projections_by_week):
+            raise SquadError("Choose an available Gameweek horizon.")
+        free_transfers = payload.get("free_transfers")
+        if type(free_transfers) is not int or not 0 <= free_transfers <= 5:
+            raise SquadError("Enter the number of free transfers available, from 0 to 5.")
+        outgoing = payload.get("outgoing_id")
+        if outgoing is not None and (type(outgoing) is not int or outgoing not in ids):
+            raise SquadError("Choose a player from your squad to sell.")
+
+        raw_sales = payload.get("selling_prices", {})
+        if not isinstance(raw_sales, dict) or raw_sales.keys() - {str(player) for player in ids}:
+            raise SquadError("Selling prices must correspond to players in your squad.")
+        selling_prices = {int(player): _money(price, "each selling price") for player, price in raw_sales.items()}
+        bank = _money(payload.get("bank"), "your cash in the bank")
+        weeks = dict(list(snapshot.projections_by_week.items())[:horizon])
+        result = recommend_transfers(ids, weeks, snapshot.live.bootstrap["elements"], bank=bank,
+                                     free_transfers=free_transfers, selling_prices=selling_prices, outgoing_id=outgoing)
+        result.update(season=season, gameweek=gameweek)
         return jsonify(result)
 
     return app

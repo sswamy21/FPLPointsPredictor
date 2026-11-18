@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f6f7f2">
     <title>FPL Optimizer</title>
-    <meta name="description" content="Use your Fantasy Premier League squad and Gameweek projections to pick your starting XI, captain, and bench.">
+    <meta name="description" content="Use your Fantasy Premier League squad and Gameweek projections to pick your lineup and compare transfer targets.">
     <link rel="stylesheet" href="/assets/styles.css">
     <script defer src="/assets/app.js"></script>
   </head>
@@ -131,6 +131,7 @@
                 <span><b>C</b> Captain</span><span><b>VC</b> Vice-captain</span>
               </div>
               <span id="lineup-breakdown" class="breakdown" hidden></span>
+              <a class="transfer-jump" id="transfer-jump" href="#transfer-heading" hidden>Transfer targets <span aria-hidden="true">↓</span></a>
             </div>
           </section>
 
@@ -140,6 +141,45 @@
               <span>By projected points</span>
             </div>
             <div class="bench-grid" id="bench-grid"></div>
+          </section>
+
+          <section class="panel transfer-panel" id="transfer-panel" aria-labelledby="transfer-heading" hidden>
+            <h2 id="transfer-heading" tabindex="-1">Transfer targets</h2>
+            <p class="panel-intro">Compare alternative single transfers using projected XI and captain points.</p>
+            <form id="transfer-form">
+              <div class="transfer-fields">
+                <div>
+                  <label for="transfer-bank">Cash in bank (£m)</label>
+                  <input id="transfer-bank" type="number" min="0" step="0.1" inputmode="decimal" value="0.0" required>
+                </div>
+                <div>
+                  <label for="transfer-free">Free transfers</label>
+                  <input id="transfer-free" type="number" min="0" max="5" step="1" inputmode="numeric" value="1" required>
+                </div>
+                <div>
+                  <label for="transfer-horizon">Compare over</label>
+                  <select id="transfer-horizon"></select>
+                </div>
+                <div>
+                  <label for="transfer-outgoing">Player to sell</label>
+                  <select id="transfer-outgoing"></select>
+                </div>
+              </div>
+              <details class="transfer-selling" id="transfer-selling">
+                <summary>Enter FPL selling prices</summary>
+                <p class="field-help">Copy the selling prices on your FPL Transfers page.</p>
+                <div class="transfer-selling-fields" id="transfer-selling-fields"></div>
+              </details>
+              <button type="submit" id="transfer-submit" class="primary-button" disabled>Find transfer targets <span aria-hidden="true">→</span></button>
+            </form>
+            <p class="field-help">Blank selling prices use market-price estimates. Later Gameweeks use today’s form and fixtures. Availability can change.</p>
+            <p id="transfer-message" class="request-message" role="status" hidden></p>
+            <p id="transfer-announcement" class="visually-hidden" role="status"></p>
+            <div id="transfer-results" class="transfer-results" hidden>
+              <p class="transfer-context" id="transfer-context"></p>
+              <p class="transfer-hold" id="transfer-hold" hidden></p>
+              <ol class="transfer-list" id="transfer-list" role="list" aria-label="Ranked transfer alternatives"></ol>
+            </div>
           </section>
         </div>
       </div>

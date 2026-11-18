@@ -416,8 +416,33 @@ def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadli
     if pd.isna(cutoff):
         raise ValueError("A forecast requires a valid upcoming Gameweek deadline.")
     builder = FeatureHistory(history_df, fixtures_df, **context)
+    return _forecast_round(model, builder, bootstrap, season, gameweek, cutoff, cutoff, True)
+
+
+def forecast_gameweeks(model, history, fixtures, bootstrap, season, gameweek, deadline, **context):
+    """Project up to three rounds from the same upcoming Gameweek information."""
+    cutoff = _date(deadline)
+    if pd.isna(cutoff):
+        raise ValueError("A forecast requires a valid upcoming Gameweek deadline.")
+    rounds = [(gameweek, cutoff)]
+    for event in sorted(bootstrap["events"], key=lambda item: item["id"]):
+        if event["id"] <= gameweek or event.get("finished"):
+            continue
+        later_deadline = _date(event.get("deadline_time"))
+        if pd.notna(later_deadline) and later_deadline > cutoff:
+            rounds.append((event["id"], later_deadline))
+        if len(rounds) == 3:
+            break
+    builder = FeatureHistory(history, fixtures, **context)
+    return {
+        week: _forecast_round(model, builder, bootstrap, season, week, week_deadline, cutoff, week == gameweek)
+        for week, week_deadline in rounds
+    }
+
+
+def _forecast_round(model, builder, bootstrap, season, gameweek, deadline, information_cutoff, use_status):
     matches = builder.fixtures.loc[builder.fixtures["_event"] == _event_order(season, gameweek)]
-    matches = matches.loc[matches["kickoff"].isna() | (matches["kickoff"] >= cutoff)].sort_values("kickoff", kind="stable")
+    matches = matches.loc[matches["kickoff"].isna() | (matches["kickoff"] >= deadline)].sort_values("kickoff", kind="stable")
     if "finished" in matches:
         matches = matches.loc[~matches["finished"].eq(True)]
     teams = {team["id"]: team for team in bootstrap["teams"]}
@@ -427,7 +452,7 @@ def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadli
     targets = _fixture_targets(matches, elements, season)
     by_element = {}
     if not targets.empty:
-        features = builder.snapshot(targets, season, gameweek, cutoff)
+        features = builder.snapshot(targets, season, gameweek, information_cutoff)
         probabilities = _predict_fixtures(model, features)
         probabilities["flag_used"] = "flag_probability" in model.feature_columns and features["flag_probability"].notna()
         by_element = {
@@ -437,7 +462,7 @@ def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadli
     for element_id, element in elements.items():
         player_fixtures = by_element.get(element_id, [])
         used_flag = any(match["flag_used"] for match in player_fixtures)
-        multiplier = 1.0 if used_flag else _status_multiplier(element, is_next)
+        multiplier = 1.0 if used_flag or not use_status else _status_multiplier(element, is_next)
         club = teams[element["team"]]
         fixture_details = []
         for match in player_fixtures:
@@ -454,6 +479,7 @@ def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadli
             "full_name": " ".join(part for part in (element.get("first_name"), element.get("second_name")) if part),
             "position": POSITION[element["element_type"]], "team": _team_label(club),
             "team_name": club.get("name", _team_label(club)), "team_id": element["team"],
+            "price": element.get("now_cost"),
             "points": math.fsum(detail["points"] for detail in fixture_details), "fixtures": fixture_details,
             "appearance_chance": _at_least_one(player_fixtures, "appearance", multiplier),
             "start_chance": _at_least_one(player_fixtures, "start", multiplier),

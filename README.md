@@ -33,6 +33,14 @@ python -m fpl optimize --squad squad.csv
 python -m fpl optimize --manager 123456 --refresh
 ```
 
+## Find transfer targets
+
+Load a squad, then open **Transfer targets** below the bench. Enter your cash in the bank and remaining free transfers. Choose a horizon of up to three Gameweeks and optionally select someone to sell. For exact affordability, copy your players’ selling prices from the FPL Transfers page. Missing values use current market prices as estimates and the affected recommendations are marked.
+
+Each result is an alternative single transfer. The app tests same-position replacements within your budget and the three-per-club limit, then re-optimizes the XI and captain in each selected round. A transfer with zero free transfers costs four points. The ranking uses total projected XI and captain gain after that hit, so a high-scoring player can still be a poor transfer if they would mostly sit on your bench. When no swap has a positive net gain, the app recommends holding. [Official transfer and selling-price rules](https://www.premierleague.com/en/news/2174907)
+
+Later rounds use today’s player form and the scheduled opposition. Upcoming availability flags only apply to their own Gameweek, so check team news for injuries and suspensions that could extend further. The recommendations use your current bank and prices and leave the decision and FPL submission to you.
+
 ## Forecast and scoring
 
 The model learns from the [historical FPL archive](https://github.com/vaastav/Fantasy-Premier-League) and the official [bootstrap](https://fantasy.premierleague.com/api/bootstrap-static/), [fixtures](https://fantasy.premierleague.com/api/fixtures/), and [element summary](https://fantasy.premierleague.com/api/element-summary/1/) endpoints. Stable player codes link season-specific IDs. Club form uses stable club codes and falls back to league priors for clubs without recent Premier League results. Missing xG, xA and xGC remain missing. Where starts are unavailable, 45 or more minutes serves as a proxy.

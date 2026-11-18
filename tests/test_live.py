@@ -64,3 +64,35 @@ def test_upload_and_manager_against_live_fpl():
     assert results[0]["bench"] == results[1]["bench"]
     assert results[2]["source"]["type"] == "manager"
     assert results[2]["source"]["gameweek"] < status["gameweek"]
+
+
+def test_transfer_search_against_live_fpl():
+    response = requests.post(f"{SERVER}/api/optimize", json={"demo": True}, timeout=15)
+    response.raise_for_status()
+    lineup = response.json()
+    players = lineup["starters"] + lineup["bench"] + [lineup["goalkeeper"]]
+    player_ids = {player["id"] for player in players}
+    payload = {
+        "season": lineup["season"], "gameweek": lineup["gameweek"], "squad_ids": list(player_ids),
+        "bank": "5.0", "free_transfers": 1, "horizon": len(lineup["transfer_gameweeks"]),
+        "selling_prices": {str(player["id"]): f'{player["price"] / 10:.1f}' for player in players},
+    }
+    for allowance, hit in ((1, 0), (0, 4)):
+        response = requests.post(f"{SERVER}/api/transfers", json=dict(payload, free_transfers=allowance), timeout=30)
+        response.raise_for_status()
+        targets = response.json()
+        assert targets["gameweeks"] == lineup["transfer_gameweeks"]
+        assert targets["hit"] == hit
+        gains = [target["net_gain"] for target in targets["candidates"]]
+        assert gains == sorted(gains, reverse=True)
+        for target in targets["candidates"]:
+            assert target["outgoing"]["id"] in player_ids and target["incoming"]["id"] not in player_ids
+            assert target["incoming"]["position"] == target["outgoing"]["position"]
+            assert target["bank_after"] == 50 + target["sale_price"] - target["incoming"]["price"] >= 0
+            assert not target["estimated_sale_price"]
+            assert target["weeks"][0]["baseline_points"] == pytest.approx(lineup["projected_points"])
+            assert target["net_gain"] == pytest.approx(fsum(week["gain"] for week in target["weeks"]) - hit)
+    stale = requests.post(f"{SERVER}/api/transfers", json=dict(payload, gameweek=0), timeout=10)
+    assert stale.status_code == 409
+    invalid = requests.post(f"{SERVER}/api/transfers", json=dict(payload, bank="0.05"), timeout=10)
+    assert invalid.status_code == 400

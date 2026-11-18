@@ -18,6 +18,7 @@ const state = {
   pollTimer: null,
   lastRequest: null,
   file: null,
+  transferRequest: null,
 };
 const dateFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -34,6 +35,11 @@ const pointsFormat = new Intl.NumberFormat(undefined, {
 const percentageFormat = new Intl.NumberFormat(undefined, {
   style: "percent",
   maximumFractionDigits: 0,
+});
+const gainFormat = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: "exceptZero",
 });
 
 function create(tag, className, content) {
@@ -68,6 +74,8 @@ function setButtonState() {
   for (const action of actions) action.disabled = inactive;
   byId("recommendation").setAttribute("aria-busy", String(state.busy));
   byId("refresh").disabled = state.busy || state.refreshing || state.status?.state === "loading";
+  const currentSquad = state.result?.season === state.status?.season && state.result?.gameweek === state.status?.gameweek;
+  byId("transfer-submit").disabled = inactive || !currentSquad || Boolean(state.transferRequest);
 }
 
 async function api(url, payload) {
@@ -119,7 +127,12 @@ function renderStatus(status) {
     byId("model-mae").textContent = points(metrics.mae);
     byId("baseline-mae").textContent = points(metrics.baseline_mae);
   }
-  if (state.result) renderLineupWarning(state.result);
+  if (state.result) {
+    renderLineupWarning(state.result);
+    if (status.gameweek && (status.season !== state.result.season || status.gameweek !== state.result.gameweek)) {
+      clearTransferResults();
+    }
+  }
   setButtonState();
 }
 
@@ -293,6 +306,7 @@ function renderLineupWarning(lineup) {
 }
 
 function renderLineup(lineup) {
+  const previous = state.result;
   state.result = lineup;
   showText("formation", lineup.formation);
   let source = lineup.source.label;
@@ -304,6 +318,177 @@ function renderLineup(lineup) {
   showText("lineup-breakdown", `${points(lineup.starting_points)} starter pts + ${points(lineup.captain_bonus)} captain pts`);
   renderLineupWarning(lineup);
   renderTiles(lineup);
+  renderTransferForm(lineup, previous);
+}
+
+function transferSquad(lineup) {
+  return [...lineup.starters, ...lineup.bench, lineup.goalkeeper];
+}
+
+function squadKey(lineup) {
+  const ids = transferSquad(lineup).map((player) => player.id).sort((left, right) => left - right);
+  return JSON.stringify([lineup.season, lineup.source.type, lineup.source.label, ids]);
+}
+
+function saleInputs() {
+  return byId("transfer-selling-fields").querySelectorAll("input");
+}
+
+function sellingPrices() {
+  return Object.fromEntries([...saleInputs()].filter((input) => input.value !== "").map((input) => [input.name, input.value]));
+}
+
+function clearTransferResults() {
+  state.transferRequest = null;
+  byId("transfer-results").hidden = true;
+  showText("transfer-message", null);
+  byId("transfer-announcement").textContent = "";
+  setButtonState();
+}
+
+function renderTransferForm(lineup, previous) {
+  clearTransferResults();
+  const rounds = lineup.transfer_gameweeks || [];
+  byId("transfer-panel").hidden = rounds.length === 0;
+  byId("transfer-jump").hidden = rounds.length === 0;
+  if (!rounds.length) return;
+
+  const sameSquad = previous && squadKey(lineup) === squadKey(previous);
+  const priorPrices = sameSquad ? sellingPrices() : {};
+  const priorOutgoing = sameSquad ? byId("transfer-outgoing").value : "";
+  const priorHorizon = sameSquad ? Number(byId("transfer-horizon").value) : rounds.length;
+  if (!sameSquad) {
+    byId("transfer-form").reset();
+    byId("transfer-selling").open = false;
+  }
+
+  const horizon = byId("transfer-horizon");
+  horizon.replaceChildren(...rounds.map((week, index) => new Option(
+    index === 0 ? `GW ${week}` : `GW ${rounds[0]}–${week}`, String(index + 1),
+  )));
+  horizon.value = String(Math.min(priorHorizon || rounds.length, rounds.length));
+
+  const players = transferSquad(lineup).sort((left, right) => (
+    positionOrder.indexOf(left.position) - positionOrder.indexOf(right.position) || left.name.localeCompare(right.name)
+  ));
+  const outgoing = byId("transfer-outgoing");
+  outgoing.replaceChildren(new Option("Any player", ""), ...players.map((player) => new Option(
+    `${player.name} (${player.team})`, String(player.id),
+  )));
+  outgoing.value = priorOutgoing;
+
+  byId("transfer-selling-fields").replaceChildren(...players.map((player) => {
+    const field = create("div");
+    const input = create("input");
+    input.id = `sale-price-${player.id}`;
+    input.name = String(player.id);
+    input.type = "number";
+    input.inputMode = "decimal";
+    input.min = "0.1";
+    input.step = "0.1";
+    input.value = priorPrices[player.id] || "";
+    if (Number.isInteger(player.price)) {
+      input.max = (player.price / 10).toFixed(1);
+      input.placeholder = `${input.max} est.`;
+    }
+    const label = create("label", "", `${player.name} (£m)`);
+    label.htmlFor = input.id;
+    field.append(label, input);
+    return field;
+  }));
+}
+
+function money(tenths) {
+  return `£${(tenths / 10).toFixed(1)}m`;
+}
+
+function transferPlayer(label, player, price, estimated = false) {
+  const block = create("div", "transfer-player");
+  const names = create("div", "transfer-player-name");
+  names.append(create("strong", "", player.name), create("span", "", player.team));
+  const flag = { d: "Doubtful", i: "Injured", s: "Suspended" }[player.status];
+  if (flag) names.append(create("span", "transfer-player-flag", flag));
+  block.append(
+    create("div", "transfer-label", label), names,
+    create("div", "transfer-player-price", `${money(price)}${estimated ? " estimated" : ""}`),
+  );
+  return block;
+}
+
+function transferCandidate(candidate) {
+  const card = create("li", "transfer-card");
+  const headline = create("div", "transfer-card-headline");
+  const gain = create("div", "transfer-gain");
+  gain.append(create("strong", "", `${gainFormat.format(candidate.net_gain)} pts`), create("span", "", "Net gain"));
+  headline.append(
+    transferPlayer("Buy", candidate.incoming, candidate.incoming.price),
+    transferPlayer("Sell", candidate.outgoing, candidate.sale_price, candidate.estimated_sale_price),
+    gain,
+  );
+
+  const details = create("div", "transfer-card-details");
+  const rounds = create("ul", "transfer-weeks");
+  for (const week of candidate.weeks) {
+    const role = week.captain ? " · Captain" : week.starts ? " · Starts" : "";
+    const fixtures = candidate.incoming.fixtures.filter((fixture) => fixture.gameweek === week.gameweek);
+    const opponents = fixtures.length ? fixtures.map(fixtureLabel).join(", ") : "Blank";
+    rounds.append(create("li", "", `GW ${week.gameweek} · ${opponents} · ${gainFormat.format(week.gain)} pts${role}`));
+  }
+  details.append(rounds, create("span", "transfer-bank-after", `${money(candidate.bank_after)} left in bank`));
+  card.append(headline, details);
+  return card;
+}
+
+function renderTransferResults(result) {
+  const first = result.gameweeks[0];
+  const last = result.gameweeks.at(-1);
+  const range = first === last ? `GW ${first}` : `GW ${first}–${last}`;
+  const hit = result.hit ? ` · ${result.hit} pt hit included per move` : "";
+  const hold = "Keep your current squad. No affordable move improves the projected total after transfer costs.";
+  byId("transfer-context").textContent = `${range} · Current squad ${points(result.baseline_points)} pts${hit}`;
+  showText("transfer-hold", result.candidates.length ? null : hold);
+  byId("transfer-list").replaceChildren(...result.candidates.map(transferCandidate));
+  byId("transfer-results").hidden = false;
+  showText("transfer-message", null);
+  byId("transfer-announcement").textContent = result.candidates.length ? "Ranked transfer targets ready." : hold;
+}
+
+async function findTransfers(event) {
+  event.preventDefault();
+  if (byId("transfer-submit").disabled) return;
+  const lineup = state.result;
+  const outgoing = byId("transfer-outgoing").value;
+  const payload = {
+    season: lineup.season,
+    gameweek: lineup.gameweek,
+    squad_ids: transferSquad(lineup).map((player) => player.id),
+    bank: byId("transfer-bank").value,
+    free_transfers: Number(byId("transfer-free").value),
+    horizon: Number(byId("transfer-horizon").value),
+    selling_prices: sellingPrices(),
+  };
+  if (outgoing) payload.outgoing_id = Number(outgoing);
+
+  const request = {};
+  state.transferRequest = request;
+  byId("transfer-results").hidden = true;
+  byId("transfer-message").classList.remove("is-error");
+  showText("transfer-message", "Comparing affordable moves…");
+  setButtonState();
+  try {
+    const result = await api("/api/transfers", payload);
+    if (state.transferRequest === request) renderTransferResults(result);
+  } catch (error) {
+    if (state.transferRequest !== request) return;
+    byId("transfer-message").classList.add("is-error");
+    showText("transfer-message", error.message);
+    if (error.status === 409) schedulePoll(500);
+  } finally {
+    if (state.transferRequest === request) {
+      state.transferRequest = null;
+      setButtonState();
+    }
+  }
 }
 
 async function optimize(payload, reveal = true) {
@@ -395,11 +580,14 @@ dropZone.addEventListener("drop", (event) => {
   selectFile(event.dataTransfer.files[0]);
 });
 byId("demo").addEventListener("click", () => optimize({ demo: true }));
+byId("transfer-form").addEventListener("submit", findTransfers);
+byId("transfer-form").addEventListener("input", clearTransferResults);
+byId("transfer-selling-fields").addEventListener("invalid", () => { byId("transfer-selling").open = true; }, true);
 byId("refresh").addEventListener("click", async () => {
   window.clearTimeout(state.pollTimer);
   state.refreshing = true;
   state.refreshRequested = true;
-  setButtonState();
+  clearTransferResults();
   showRequest("");
   try {
     const status = await api("/api/refresh", {});

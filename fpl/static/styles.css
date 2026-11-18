@@ -16,6 +16,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 body {
   margin: 0;
   background: var(--paper);
@@ -23,12 +24,12 @@ body {
   font: 400 15px/1.5 Geist, Inter, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-button, input { font: inherit; }
-button, a, input { -webkit-tap-highlight-color: transparent; }
+button, input, select { font: inherit; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 button:disabled { cursor: wait; }
 a { color: var(--green); }
-button:focus-visible, a:focus-visible, input:focus-visible, .drop-zone:focus-within {
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, .drop-zone:focus-within {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
@@ -407,6 +408,64 @@ button.bench-tile:hover { border-color: #75a88a; background: #eef6ee; }
 .bench-tile .player-points { color: var(--green); font-size: .86rem; }
 .bench-tile .bench-label { font-weight: 700; }
 
+.transfer-jump { font-weight: 700; white-space: nowrap; text-underline-offset: 2px; }
+.transfer-panel h2 { font-size: 1.22rem; }
+.transfer-panel form { margin-top: 14px; }
+.transfer-fields, .transfer-selling-fields { display: grid; gap: 10px 12px; }
+.transfer-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.transfer-panel input, .transfer-panel select {
+  width: 100%;
+  min-height: 42px;
+  min-width: 0;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid #cbd6cc;
+  border-radius: 7px;
+  font-size: .88rem;
+}
+.transfer-panel input::placeholder { color: var(--muted); }
+.transfer-selling { margin-top: 12px; }
+.transfer-selling summary { width: fit-content; cursor: pointer; color: var(--green); font-weight: 650; font-size: .85rem; }
+.transfer-selling summary:hover { text-decoration: underline; }
+.transfer-selling-fields { grid-template-columns: repeat(auto-fit, minmax(min(138px, 100%), 1fr)); margin-top: 10px; }
+.transfer-selling-fields label { overflow-wrap: anywhere; }
+.transfer-panel .primary-button { width: auto; min-width: min(190px, 100%); }
+.transfer-results { margin-top: 14px; }
+.transfer-context, .transfer-bank-after { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.transfer-hold { margin-top: 7px; color: var(--green); font-weight: 650; font-size: .88rem; }
+.transfer-list, .transfer-weeks { list-style: none; padding: 0; margin: 0; }
+.transfer-list { display: grid; gap: 8px; margin-top: 8px; }
+.transfer-card { min-width: 0; padding: 10px 12px; background: #f4f7f2; border: 1px solid #e5ebe2; border-radius: 8px; }
+.transfer-card:first-child { border-color: #bbd6bd; }
+.transfer-card-headline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 12px;
+}
+.transfer-label { color: var(--green); font-size: .72rem; font-weight: 700; }
+.transfer-player-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
+.transfer-player-name strong { overflow-wrap: anywhere; line-height: 1.2; }
+.transfer-player-name span, .transfer-player-price { color: var(--muted); font-size: .76rem; }
+.transfer-player-name .transfer-player-flag { color: #684a16; }
+.transfer-player-price { font-variant-numeric: tabular-nums; }
+.transfer-gain { text-align: right; }
+.transfer-gain strong { color: var(--green); font-size: 1.18rem; font-weight: 800; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.transfer-gain span { display: block; color: var(--muted); font-size: .73rem; }
+.transfer-card-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 7px;
+  padding-top: 6px;
+}
+.transfer-weeks { display: flex; flex-wrap: wrap; gap: 3px 9px; color: var(--green); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.transfer-weeks li { overflow-wrap: anywhere; }
+
 .player-dialog {
   width: min(390px, calc(100% - 32px));
   max-height: calc(100% - 32px);
@@ -433,6 +492,7 @@ button.bench-tile:hover { border-color: #75a88a; background: #eef6ee; }
   .shell { width: calc(100% - 46px); }
   .dashboard { gap: 14px; grid-template-columns: minmax(220px, 252px) minmax(0, 1fr); }
   .panel { padding-inline: 14px; }
+  .transfer-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 790px) {
   .shell { width: calc(100% - 34px); }
@@ -471,4 +531,7 @@ button.bench-tile:hover { border-color: #75a88a; background: #eef6ee; }
   .role-badge { right: 0; top: 5px; }
   .lineup-footer { padding-inline: 10px; }
   .bench-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .transfer-panel input, .transfer-panel select { font-size: 1rem; }
+  .transfer-card-headline { gap: 8px; }
+  .transfer-gain strong { font-size: .96rem; }
 }
