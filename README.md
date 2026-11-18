@@ -35,7 +35,7 @@ python -m fpl optimize --manager 123456 --refresh
 
 ## Find transfer targets
 
-Load a squad, then open **Transfer targets** below the bench. Enter your cash in the bank and remaining free transfers. Choose a horizon of up to three Gameweeks and optionally select someone to sell. For exact affordability, copy your players’ selling prices from the FPL Transfers page. Missing values use current market prices as estimates and the affected recommendations are marked.
+Load a squad, then open **Transfer targets** below the bench. Enter your cash in the bank and remaining free transfers. The app compares the next five Gameweeks by default, or all remaining rounds if fewer are scheduled. You can choose a shorter horizon or select someone to sell. For exact affordability, copy your players’ selling prices from the FPL Transfers page. Missing values use current market prices as estimates and the affected recommendations are marked.
 
 Each result is an alternative single transfer. The app tests same-position replacements within your budget and the three-per-club limit, then re-optimizes the XI and captain in each selected round. A transfer with zero free transfers costs four points. The ranking uses total projected XI and captain gain after that hit, so a high-scoring player can still be a poor transfer if they would mostly sit on your bench. When no swap has a positive net gain, the app recommends holding. [Official transfer and selling-price rules](https://www.premierleague.com/en/news/2174907)
 

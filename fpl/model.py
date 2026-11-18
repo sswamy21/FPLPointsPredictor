@@ -9,6 +9,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from threadpoolctl import threadpool_limits
 
+from . import TRANSFER_HORIZON
 from .data import player_identity
 from .player_workload import FEATURES as WORKLOAD_FEATURES, workload_features
 
@@ -420,7 +421,7 @@ def forecast(model, history_df, fixtures_df, bootstrap, season, gameweek, deadli
 
 
 def forecast_gameweeks(model, history, fixtures, bootstrap, season, gameweek, deadline, **context):
-    """Project up to three rounds from the same upcoming Gameweek information."""
+    """Project the transfer horizon from the same upcoming Gameweek information."""
     cutoff = _date(deadline)
     if pd.isna(cutoff):
         raise ValueError("A forecast requires a valid upcoming Gameweek deadline.")
@@ -431,7 +432,7 @@ def forecast_gameweeks(model, history, fixtures, bootstrap, season, gameweek, de
         later_deadline = _date(event.get("deadline_time"))
         if pd.notna(later_deadline) and later_deadline > cutoff:
             rounds.append((event["id"], later_deadline))
-        if len(rounds) == 3:
+        if len(rounds) == TRANSFER_HORIZON:
             break
     builder = FeatureHistory(history, fixtures, **context)
     return {

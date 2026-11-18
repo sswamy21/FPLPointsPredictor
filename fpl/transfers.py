@@ -3,6 +3,7 @@
 from collections import Counter, defaultdict
 from math import fsum
 
+from . import TRANSFER_HORIZON
 from .lineup import POSITION_IDS, SquadError, optimize
 
 
@@ -44,8 +45,8 @@ def recommend_transfers(squad_ids, projections_by_week, elements, *, bank, free_
         raise SquadError("Enter a non-negative amount in the bank.")
     if not _valid_amount(free_transfers) or free_transfers > 5:
         raise SquadError("Enter between zero and five free transfers.")
-    if not 1 <= len(projections_by_week) <= 3:
-        raise SquadError("Choose one to three Gameweeks for transfer projections.")
+    if not 1 <= len(projections_by_week) <= TRANSFER_HORIZON:
+        raise SquadError(f"Choose between 1 and {TRANSFER_HORIZON} Gameweeks for transfer projections.")
 
     weeks = sorted(projections_by_week.items())
     baseline = {week: optimize(squad_ids, projections)["projected_points"] for week, projections in weeks}

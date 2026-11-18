@@ -74,7 +74,7 @@ def test_transfer_search_against_live_fpl():
     player_ids = {player["id"] for player in players}
     payload = {
         "season": lineup["season"], "gameweek": lineup["gameweek"], "squad_ids": list(player_ids),
-        "bank": "5.0", "free_transfers": 1, "horizon": len(lineup["transfer_gameweeks"]),
+        "bank": "5.0", "free_transfers": 1,
         "selling_prices": {str(player["id"]): f'{player["price"] / 10:.1f}' for player in players},
     }
     for allowance, hit in ((1, 0), (0, 4)):
@@ -92,6 +92,9 @@ def test_transfer_search_against_live_fpl():
             assert not target["estimated_sale_price"]
             assert target["weeks"][0]["baseline_points"] == pytest.approx(lineup["projected_points"])
             assert target["net_gain"] == pytest.approx(fsum(week["gain"] for week in target["weeks"]) - hit)
+    shorter = requests.post(f"{SERVER}/api/transfers", json=dict(payload, horizon=1), timeout=30)
+    shorter.raise_for_status()
+    assert shorter.json()["gameweeks"] == [lineup["gameweek"]]
     stale = requests.post(f"{SERVER}/api/transfers", json=dict(payload, gameweek=0), timeout=10)
     assert stale.status_code == 409
     invalid = requests.post(f"{SERVER}/api/transfers", json=dict(payload, bank="0.05"), timeout=10)

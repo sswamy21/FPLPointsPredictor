@@ -162,23 +162,27 @@ class ForecastTests(unittest.TestCase):
         prior = match(1, 1, "2026-08-08 15:00")
         upcoming = match(2, 3, "2026-08-22 15:00", finished=False)
         later_result = match(3, 3, "2026-08-23 15:00")
-        later = match(4, 4, "2026-08-29 15:00", finished=False)
-        final = match(5, 5, "2026-09-05 15:00", finished=False)
+        future = [
+            match(week, week, kickoff, finished=False)
+            for week, kickoff in enumerate((
+                "2026-08-29 15:00", "2026-09-05 15:00", "2026-09-12 15:00",
+                "2026-09-19 15:00", "2026-09-26 15:00",
+            ), start=4)
+        ]
         calendar = bootstrap()
         calendar["events"] += [
-            {"id": 4, "deadline_time": later["deadline"].isoformat()},
-            {"id": 5, "deadline_time": final["deadline"].isoformat()},
-            {"id": 6, "deadline_time": "2026-09-12T12:00:00Z"},
+            {"id": fixture["gameweek"], "deadline_time": fixture["deadline"].isoformat()}
+            for fixture in future
         ]
         fitted = FPLModel(AlwaysStarts(), RecentPoints(), ("points_3",), {}, 1, [2026])
         weeks = forecast_gameweeks(
             fitted, pd.DataFrame([outcome(prior, 5), outcome(later_result, 99)]),
-            pd.DataFrame([prior, upcoming, later_result, later, final]), calendar, 2026, 3, upcoming["deadline"],
+            pd.DataFrame([prior, upcoming, later_result, *future]), calendar, 2026, 3, upcoming["deadline"],
         )
-        self.assertEqual(list(weeks), [3, 4, 5])
-        self.assertEqual([week[99]["points"] for week in weeks.values()], [5, 5, 5])
-        self.assertEqual([week[101]["points"] for week in weeks.values()], [1, 2, 2])
-        self.assertEqual([week[100]["points"] for week in weeks.values()], [0, 0, 0])
+        self.assertEqual(list(weeks), [3, 4, 5, 6, 7])
+        self.assertEqual([week[99]["points"] for week in weeks.values()], [5] * 5)
+        self.assertEqual([week[101]["points"] for week in weeks.values()], [1, 2, 2, 2, 2])
+        self.assertEqual([week[100]["points"] for week in weeks.values()], [0] * 5)
 
     def test_double_and_blank_fixtures_and_official_availability(self):
         prior = match(1, 1, "2026-08-08 15:00")

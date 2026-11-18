@@ -36,19 +36,23 @@ def test_rankings_use_full_horizon_and_reoptimized_captaincy():
     squad, elements = market()
     add_player(elements, 16)
     add_player(elements, 17)
-    points = projections(elements, {16: 7, 17: 4}, {16: 1, 17: 5}, {16: 1, 17: 5})
+    points = projections(elements, {16: 7, 17: 3}, *([{16: 1, 17: 3}] * 3), {16: 1, 17: 5})
+    four_weeks = {week: values for week, values in points.items() if week < 15}
+    shorter = recommend_transfers(squad, four_weeks, elements, bank=0, free_transfers=0, outgoing_id=8)
+    assert shorter["candidates"][0]["incoming"]["id"] == 16
+
     result = recommend_transfers(squad, points, elements, bank=0, free_transfers=0, outgoing_id=8)
-    assert result["gameweeks"] == [11, 12, 13]
-    assert result["baseline_points"] == 72
+    assert result["gameweeks"] == [11, 12, 13, 14, 15]
+    assert result["baseline_points"] == 120
     assert result["hit"] == 4
     assert [candidate["incoming"]["id"] for candidate in result["candidates"]] == [17, 16]
     winner = result["candidates"][0]
-    assert winner["gross_gain"] == 16
-    assert winner["net_gain"] == 12
-    assert [week["gain"] for week in winner["weeks"]] == [4, 6, 6]
+    assert winner["gross_gain"] == 14
+    assert winner["net_gain"] == 10
+    assert [week["gain"] for week in winner["weeks"]] == [2, 2, 2, 2, 6]
     assert all(week["starts"] and week["captain"] for week in winner["weeks"])
-    assert [fixture["gameweek"] for fixture in winner["incoming"]["fixtures"]] == [11, 12, 13]
-    assert [week["starts"] for week in result["candidates"][1]["weeks"]] == [True, False, False]
+    assert [fixture["gameweek"] for fixture in winner["incoming"]["fixtures"]] == [11, 12, 13, 14, 15]
+    assert [week["starts"] for week in result["candidates"][1]["weeks"]] == [True, False, False, False, False]
 
 
 def test_budget_uses_confirmed_selling_price_or_marks_estimate():
